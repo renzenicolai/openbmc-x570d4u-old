@@ -1,0 +1,30 @@
+From f6c9797a04ecdfffe825950f3676391914b4e7f4 Mon Sep 17 00:00:00 2001
+From: Ed Tanous <edtanous@google.com>
+Date: Tue, 2 Mar 2021 11:41:41 -0800
+Subject: [PATCH] Add alternative UBI flash partition
+
+Some openbmc systems contain a secondary flash that can be added and
+opened through the boot.  This patchset changes the u-boot build args to
+make that block device available to the boot args.
+
+Signed-off-by: Ed Tanous <edtanous@google.com>
+---
+ include/configs/ast-common.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/configs/ast-common.h b/include/configs/ast-common.h
+index 2c9c99159e..84db2cb30f 100644
+--- a/include/configs/ast-common.h
++++ b/include/configs/ast-common.h
+@@ -105,7 +105,7 @@
+ #if 0
+ #define CONFIG_BOOTARGS			"console=ttyS4,115200n8 root=/dev/ram rw"
+ #endif
+-#define CONFIG_BOOTARGS			"console=ttyS4,115200n8 ubi.mtd=obmc-ubi,0,0,0 ro rootfstype=squashfs"
++#define CONFIG_BOOTARGS			"console=ttyS4,115200n8 ubi.mtd=obmc-ubi,0,0,0 ubi.mtd=alt-obmc-ubi,0,0,4 ro rootfstype=squashfs"
+ 
+ #define CONFIG_AST_SPI_NOR    /* AST SPI NOR Flash */
+ #define CONFIG_FMC_CS			1
+-- 
+2.30.1.766.gb4fecdf3b7-goog
+

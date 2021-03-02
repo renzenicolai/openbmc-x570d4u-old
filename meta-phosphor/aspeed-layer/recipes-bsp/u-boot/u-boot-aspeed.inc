@@ -2,13 +2,15 @@ inherit image_version
 
 SRC_URI_append_aspeed = " file://0001-configs-ast-Add-redundnant-env.patch"
 
-SRC_URI_append_aspeed_df-obmc-ubi-fs = " \
+SRC_URI_append_aspeed_obmc-ubi-fs = " \
     file://0002-config-ast-common-hack-bootopts.patch \
     file://0003-config-ast-common-Add-bootopts-to-support-ubi-and-mt.patch \
     file://0004-config-ast-common-Add-conditional-factory-reset-comm.patch \
-    file://0005-config-ast-common-Fall-back-to-secondary-flash-on-fa.patch \
     "
-
+SRC_URI_append_aspeed_df-obmc-ubi-fs = " \
+    file://0005-Add-alternative-UBI-flash-partition.patch \
+    file://0006-config-ast-common-Fall-back-to-secondary-flash-on-fa.patch \
+    "
 SRC_URI_append_aspeed_df-isolate-bmc = " \
     file://0001-aspeed-Disable-unnecessary-features.patch \
     "

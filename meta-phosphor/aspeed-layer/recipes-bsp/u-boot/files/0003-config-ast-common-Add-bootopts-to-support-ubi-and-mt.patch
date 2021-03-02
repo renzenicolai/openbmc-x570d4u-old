@@ -31,7 +31,7 @@ index 7ddba62298..14191e4ab0 100644
  #define CONFIG_BOOTARGS			"console=ttyS4,115200n8 root=/dev/ram rw"
  #endif
 -#define CONFIG_BOOTARGS                         "console=ttyS4,115200n8 root=/dev/mtdblock4 ro"
-+#define CONFIG_BOOTARGS			"console=ttyS4,115200n8 ubi.mtd=obmc-ubi,0,0,0 ubi.mtd=alt-obmc-ubi,0,0,4 ro rootfstype=squashfs"
++#define CONFIG_BOOTARGS			"console=ttyS4,115200n8 ubi.mtd=obmc-ubi,0,0,0 ro rootfstype=squashfs"
  
  #define CONFIG_AST_SPI_NOR    /* AST SPI NOR Flash */
  #define CONFIG_FMC_CS			1
