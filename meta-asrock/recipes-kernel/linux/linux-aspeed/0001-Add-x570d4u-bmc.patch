@@ -11,111 +11,280 @@ Subject: [PATCH] Add x570d4u bmc
 diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-x570d4u.dts b/arch/arm/boot/dts/aspeed-bmc-opp-x570d4u.dts
 new file mode 100644
 index 000000000000..c3efd704d2c2
---- /dev/null
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-x570d4u.dts
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,274 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/dts-v1/;
 +#include "aspeed-g5.dtsi"
 +#include <dt-bindings/gpio/aspeed-gpio.h>
 +
 +/ {
-+	model = "Asrock Rack X570D4U";
-+	compatible = "aspeed,ast2500";
++    model = "Asrock Rack X570D4U";
++    compatible = "aspeed,ast2500";
 +
-+	chosen {
-+		stdout-path = &uart5;
-+		bootargs = "console=ttyS4,115200 earlyprintk";
-+	};
++    chosen {
++            stdout-path = &uart5;
++            bootargs = "console=ttyS4,115200 earlyprintk";
++    };
 +
-+	memory@80000000 {
-+		reg = <0x80000000 0x20000000>;
-+	};
++    memory@80000000 {
++            reg = <0x80000000 0x20000000>;
++    };
 +
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++    reserved-memory {
++            #address-cells = <1>;
++            #size-cells = <1>;
++            ranges;
 +
-+		flash_memory: region@98000000 {
-+			no-map;
-+			reg = <0x98000000 0x04000000>; /* 64M */
-+		};
-+	};
++            flash_memory: region@98000000 {
++                    no-map;
++                    reg = <0x98000000 0x04000000>; /* 64M */
++            };
 +
++            vga_memory: framebuffer@9f000000 {
++                no-map;
++                reg = <0x9f000000 0x01000000>; /* 16M */
++            };
++
++            pci_memory: region@9A000000 {
++                no-map;
++                reg = <0x9A000000 0x00010000>; /* 64K */
++            };
++
++            video_engine_memory: jpegbuffer {
++                size = <0x02800000>;	/* 40M */
++                alignment = <0x01000000>;
++                compatible = "shared-dma-pool";
++                reusable;
++            };
++
++            gfx_memory: framebuffer {
++                size = <0x01000000>;
++                alignment = <0x01000000>;
++                compatible = "shared-dma-pool";
++                reusable;
++            };
++    };
++
++    leds {
++        compatible = "gpio-leds";
++
++        heartbeat {
++            /* BMC_HB_LED_N */
++            gpios = <&gpio ASPEED_GPIO(H, 6) GPIO_ACTIVE_LOW>;
++            linux,default-trigger = "timer";
++        };
++
++        system-fault {
++            /* SYSTEM_FAULT_LED_N */
++            gpios = <&gpio ASPEED_GPIO(Z, 2) GPIO_ACTIVE_LOW>;
++            panic-indicator;
++        };
++    };
++    
++    gpio-keys {
++        compatible = "gpio-keys";
++
++        uid-button {
++            label = "uid-button";
++            gpios = <&gpio ASPEED_GPIO(F, 1) GPIO_ACTIVE_LOW>;
++            linux,code = <ASPEED_GPIO(F, 1)>;
++        };
++    };
 +};
 +
 +&gpio {
-+	gpio-line-names =
-+	/*A0-A7*/	"","","","","","","","",
-+	/*B0-B7*/	"","","","","","","","",
-+	/*C0-C7*/	"","","","","","","","",
-+	/*D0-D7*/	"","","","","","","","",
-+	/*E0-E7*/	"","","","","","","","",
-+	/*F0-F7*/	"","","","","","","","",
-+	/*G0-G7*/	"","","","","","","","",
-+	/*H0-H7*/	"","","","","","","","",
-+	/*I0-I7*/	"","","","","","","","",
-+	/*J0-J7*/	"","","","","","","","",
-+	/*K0-K7*/	"","","","","","","","",
-+	/*L0-L7*/	"","","","","","","","",
-+	/*M0-M7*/	"","","","","","","","",
-+	/*N0-N7*/	"","","","",
-+		        "","","","",
-+	/*O0-O7*/	"","","","","","","","",
-+	/*P0-P7*/	"","","","","","","","",
-+	/*Q0-Q7*/	"","","","","","","","",
-+	/*R0-R7*/	"","","","","","","","",
-+	/*S0-S7*/	"","","","","","","","",
-+	/*T0-T7*/	"","","","","","","","",
-+	/*U0-U7*/	"","","","","","","","",
-+	/*V0-V7*/	"","","","","","","","",
-+	/*W0-W7*/	"","","","","","","","",
-+	/*X0-X7*/	"","","","","","","","",
-+	/*Y0-Y7*/	"","","","","","","","",
-+	/*Z0-Z7*/	"","","","","","","","",
-+	/*AA0-AA7*/	"","","","","","","","",
-+	/*AB0-AB7*/	"","","","","","","","",
-+	/*AC0-AC7*/	"","","","","","","","";
++    status = "okay";
++    gpio-line-names =
++    /*A0-A7*/       "","","","NMI_BTN_N","","","","",
++    /*B0-B7*/       "","","","","","","","",
++    /*C0-C7*/       "","","","","","","","",
++    /*D0-D7*/       "","","","","","","","",
++    /*E0-E7*/       "","","","","","","","",
++    /*F0-F7*/       "","","","","","","","",
++    /*G0-G7*/       "HWM_BAT_EN","","","","","","","",
++    /*H0-H7*/       "","","","","MFG_MODE_N","","BMC_HB_LED_N","",
++    /*I0-I7*/       "","","","","","","","",
++    /*J0-J7*/       "BMC_READY","","","","","","","",
++    /*K0-K7*/       "","","","","","","","",
++    /*L0-L7*/       "","","","","","","","",
++    /*M0-M7*/       "","","","","","","","",
++    /*N0-N7*/       "","","","",
++                    "","","","",
++    /*O0-O7*/       "","","","","","","","",
++    /*P0-P7*/       "","","","","","","","",
++    /*Q0-Q7*/       "","","","","","","","",
++    /*R0-R7*/       "","","","","","","","",
++    /*S0-S7*/       "","","","","","","","",
++    /*T0-T7*/       "","","","","","","","",
++    /*U0-U7*/       "","","","","","","","",
++    /*V0-V7*/       "","","","","","","","",
++    /*W0-W7*/       "","","","","","","","",
++    /*X0-X7*/       "","","","","","","","",
++    /*Y0-Y7*/       "","","","","","","","",
++    /*Z0-Z7*/       "","","SYSTEM_FAULT_LED_N","","","","","",
++    /*AA0-AA7*/     "","","","","","","","",
++    /*AB0-AB7*/     "","","","","","","","",
++    /*AC0-AC7*/     "","","","","","","","";
++    
++    /* Assert BMC_READY so BIOS doesn't sit around waiting for it */
++    bmc-ready {
++        gpio-hog;
++        gpios = <ASPEED_GPIO(J, 0) GPIO_ACTIVE_LOW>;
++        output-high;
++    };
 +};
 +
 +&fmc {
-+	status = "okay";
-+	flash@0 {
-+		status = "okay";
-+		label = "bmc";
-+		m25p,fast-read;
-+		spi-max-frequency = <10000000>;
-+
-+		partitions {
-+			#address-cells = < 1 >;
-+			#size-cells = < 1 >;
-+			compatible = "fixed-partitions";
-+			u-boot@0 {
-+				reg = < 0 0x60000 >;
-+				label = "u-boot";
-+			};
-+			u-boot-env@60000 {
-+				reg = < 0x60000 0x20000 >;
-+				label = "u-boot-env";
-+			};
-+			obmc-ubi@80000 {
-+				reg = < 0x80000 0x1F80000 >;
-+				label = "obmc-ubi";
-+			};
-+		};
-+	};
++    status = "okay";
++    flash@0 {
++            status = "okay";
++            label = "bmc";
++            m25p,fast-read;
++            spi-max-frequency = <10000000>;
++            #include "openbmc-flash-layout.dtsi"
++    };
 +};
 +
 +&uart5 {
-+	status = "okay";
++    status = "okay";
 +};
 +
 +&vuart {
-+	status = "okay";
++    status = "okay";
 +};
 +
++&mac0 {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_rgmii1_default &pinctrl_mdio1_default>;
++};
++
++&mac1 {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_rgmii2_default &pinctrl_mdio2_default>;
++};
++
++&i2c1 {
++    status = "okay";
++    
++    /* Thermal sensor */
++    w83773g@4c {
++        compatible = "nuvoton,w83773g";
++        reg = <0x4c>;
++    };
++};
++
++&i2c3 {
++    status = "okay";
++};
++
++&i2c4 {
++    status = "okay";
++};
++
++&i2c7 {
++    status = "okay";
++    
++    /* FRU EEPROM */
++    eeprom@57 {
++        compatible = "st,24c128", "atmel,24c128";
++        reg = <0x57>;
++        pagesize = <16>;
++    };
++};
++
++&gfx {
++    status = "okay";
++};
++
++&pinctrl {
++    aspeed,external-nodes = <&gfx &lhc>;
++};
++
++&vhub {
++    status = "okay";
++};
++
++/*&ehci1 {
++    status = "okay";
++};
++&uhci {
++    status = "okay";
++};*/
++
++&kcs3 {
++    kcs_addr = <0xca2>;
++    status = "okay";
++};
++
++&lpc_ctrl {
++    status = "okay";
++};
++
++&lpc_snoop {
++    status = "okay";
++    snoop-ports = <0x80>;
++};
++
++&p2a {
++    status = "okay";
++    memory-region = <&pci_memory>;
++};
++
++&video {
++    status = "okay";
++    memory-region = <&video_engine_memory>;
++};
++
++&gfx {
++    status = "okay";
++    memory-region = <&gfx_memory>;
++};
++
++&pwm_tacho {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&pinctrl_pwm0_default
++                &pinctrl_pwm1_default
++                &pinctrl_pwm2_default
++                &pinctrl_pwm3_default
++                &pinctrl_pwm4_default
++                &pinctrl_pwm5_default
++                &pinctrl_pwm6_default
++                &pinctrl_pwm7_default>;
++    fan@0 {
++        reg = <0x00>;
++        aspeed,fan-tach-ch = /bits/ 8 <0x00 0x01>;
++    };
++    fan@1 {
++        reg = <0x01>;
++        aspeed,fan-tach-ch = /bits/ 8 <0x02 0x03>;
++    };
++    fan@2 {
++        reg = <0x02>;
++        aspeed,fan-tach-ch = /bits/ 8 <0x04 0x05>;
++    };
++    fan@3 {
++        reg = <0x03>;
++        aspeed,fan-tach-ch = /bits/ 8 <0x06 0x07>;
++    };
++    fan@4 {
++        reg = <0x04>;
++        aspeed,fan-tach-ch = /bits/ 8 <0x08 0x09>;
++    };
++    fan@5 {
++        reg = <0x05>;
++        aspeed,fan-tach-ch = /bits/ 8 <0x0a 0x0b>;
++    };
++    fan@6 {
++        reg = <0x06>;
++        aspeed,fan-tach-ch = /bits/ 8 <0x0c 0x0d>;
++    };
++    fan@7 {
++        reg = <0x07>;
++        aspeed,fan-tach-ch = /bits/ 8 <0x0e 0x0f>;
++    };
++};
 -- 
 2.25.1
-
-
