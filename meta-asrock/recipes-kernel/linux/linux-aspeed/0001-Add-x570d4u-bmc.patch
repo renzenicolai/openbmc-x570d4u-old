@@ -11,7 +11,7 @@ Subject: [PATCH] Add x570d4u bmc
 diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-x570d4u.dts b/arch/arm/boot/dts/aspeed-bmc-opp-x570d4u.dts
 new file mode 100644
 index 000000000000..c3efd704d2c2
-@@ -0,0 +1,274 @@
+@@ -0,0 +1,275 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/dts-v1/;
 +#include "aspeed-g5.dtsi"
@@ -160,9 +160,10 @@ index 000000000000..c3efd704d2c2
 +};
 +
 +&mac1 {
-+    status = "okay";
-+    pinctrl-names = "default";
-+    pinctrl-0 = <&pinctrl_rgmii2_default &pinctrl_mdio2_default>;
++      status = "okay";
++      pinctrl-names = "default";
++      pinctrl-0 = <&pinctrl_rmii2_default>;
++      use-ncsi;
 +};
 +
 +&i2c1 {
