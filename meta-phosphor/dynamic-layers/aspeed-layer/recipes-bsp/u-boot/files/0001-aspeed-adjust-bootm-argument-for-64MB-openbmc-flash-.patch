@@ -1,0 +1,26 @@
+From 70e70d1ad124b9e0eca987e67771b499c3057e99 Mon Sep 17 00:00:00 2001
+From: Zev Weiss <zev@bewilderbeest.net>
+Date: Fri, 25 Jun 2021 20:05:36 -0500
+Subject: [PATCH] aspeed: adjust bootm argument for 64MB openbmc flash layout
+
+Signed-off-by: Zev Weiss <zev@bewilderbeest.net>
+---
+ include/configs/ast-common.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/configs/ast-common.h b/include/configs/ast-common.h
+index a0243083bd8d..14ba1f2d6a77 100644
+--- a/include/configs/ast-common.h
++++ b/include/configs/ast-common.h
+@@ -111,7 +111,7 @@
+ #define CONFIG_ENV_SIZE			0x10000	/* Total Size of Environment Sector */
+ #define CONFIG_ENV_SIZE_REDUND		0x10000
+ 
+-#define CONFIG_BOOTCOMMAND		"bootm 20080000"
++#define CONFIG_BOOTCOMMAND		"bootm 20100000"
+ #define CONFIG_ENV_OVERWRITE
+ 
+ #define ASPEED_ENV_SETTINGS \
+-- 
+2.17.1
+

@@ -18,6 +18,14 @@ SRC_URI:append:aspeed:df-aspeednic-use-mac2 = " \
 SRC_URI:append:aspeed:df-aspeed-spi-master = " \
     file://0006-aspeed-Enable-SPI-master-mode-by-default.patch \
     "
+
+DISTROOVERRIDES .= ":flash-${FLASH_SIZE}"
+FLASH_SIZE ?= "32768"
+
+SRC_URI:append:aspeed:flash-65536 = " \
+    file://0001-aspeed-adjust-bootm-argument-for-64MB-openbmc-flash-.patch \
+    "
+
 do_patch[depends] += "os-release:do_populate_sysroot"
 
 python do_patch:append:aspeed:df-obmc-ubi-fs () {
