@@ -1,6 +1,7 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 SRC_URI:append:x570d4u = " \
     file://aspeed-bmc-asrock-x570d4u.dts \
+    file://x570d4u.cfg \
 "
 
 do_patch:append() {
