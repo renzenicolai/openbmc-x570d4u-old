@@ -21,16 +21,6 @@
 			#size-cells = <1>;
 			ranges;
 
-			flash_memory: region@98000000 {
-					no-map;
-					reg = <0x98000000 0x04000000>; /* 64M */
-			};
-
-			vga_memory: framebuffer@9f000000 {
-				no-map;
-				reg = <0x9f000000 0x01000000>; /* 16M */
-			};
-
 			pci_memory: region@9A000000 {
 				no-map;
 				reg = <0x9A000000 0x00010000>; /* 64K */
@@ -38,13 +28,6 @@
 
 			video_engine_memory: jpegbuffer {
 				size = <0x02800000>;	/* 40M */
-				alignment = <0x01000000>;
-				compatible = "shared-dma-pool";
-				reusable;
-			};
-
-			gfx_memory: framebuffer {
-				size = <0x01000000>;
 				alignment = <0x01000000>;
 				compatible = "shared-dma-pool";
 				reusable;
@@ -173,9 +156,11 @@
 
 &mac1 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rmii2_default &pinctrl_mdio2_default>;
 	use-ncsi;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_rmii1_default>;
+	clocks = <&syscon ASPEED_CLK_GATE_MAC1CLK>, <&syscon ASPEED_CLK_MAC1RCLK>;
+	clock-names = "MACCLK", "RCLK";
 };
 
 &i2c0 {
@@ -294,11 +279,6 @@
 &video {
 	status = "okay";
 	memory-region = <&video_engine_memory>;
-};
-
-&gfx {
-	status = "okay";
-	memory-region = <&gfx_memory>;
 };
 
 &pwm_tacho {
