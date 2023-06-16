@@ -156,11 +156,11 @@
 
 &mac1 {
 	status = "okay";
-	use-ncsi;
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rmii1_default>;
+	pinctrl-0 = <&pinctrl_rmii2_default &pinctrl_mdio2_default>;
 	clocks = <&syscon ASPEED_CLK_GATE_MAC1CLK>, <&syscon ASPEED_CLK_MAC1RCLK>;
 	clock-names = "MACCLK", "RCLK";
+	use-ncsi;
 };
 
 &i2c0 {
