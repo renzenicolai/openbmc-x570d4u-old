@@ -95,17 +95,18 @@ def get_patched_cves(d):
     for url in oe.patch.src_patches(d):
         patch_file = bb.fetch.decodeurl(url)[2]
 
-        # Remote compressed patches may not be unpacked, so silently ignore them
-        if not os.path.isfile(patch_file):
-            bb.warn("%s does not exist, cannot extract CVE list" % patch_file)
-            continue
-
         # Check patch file name for CVE ID
         fname_match = cve_file_name_match.search(patch_file)
         if fname_match:
             cve = fname_match.group(1).upper()
             patched_cves.add(cve)
             bb.debug(2, "Found CVE %s from patch file name %s" % (cve, patch_file))
+
+        # Remote patches won't be present and compressed patches won't be
+        # unpacked, so say we're not scanning them
+        if not os.path.isfile(patch_file):
+            bb.note("%s is remote or compressed, not scanning content" % patch_file)
+            continue
 
         with open(patch_file, "r", encoding="utf-8") as f:
             try:
@@ -130,6 +131,13 @@ def get_patched_cves(d):
         if not fname_match and not text_match:
             bb.debug(2, "Patch %s doesn't solve CVEs" % patch_file)
 
+    # Search for additional patched CVEs
+    for cve in (d.getVarFlags("CVE_STATUS") or {}):
+        decoded_status, _, _ = decode_cve_status(d, cve)
+        if decoded_status == "Patched":
+            bb.debug(2, "CVE %s is additionally patched" % cve)
+            patched_cves.add(cve)
+
     return patched_cves
 
 
@@ -149,7 +157,7 @@ def get_cpe_ids(cve_product, version):
         else:
             vendor = "*"
 
-        cpe_id = 'cpe:2.3:a:{}:{}:{}:*:*:*:*:*:*:*'.format(vendor, product, version)
+        cpe_id = 'cpe:2.3:*:{}:{}:{}:*:*:*:*:*:*:*'.format(vendor, product, version)
         cpe_ids.append(cpe_id)
 
     return cpe_ids
@@ -165,7 +173,7 @@ def cve_check_merge_jsons(output, data):
 
     for product in output["package"]:
         if product["name"] == data["package"][0]["name"]:
-            bb.error("Error adding the same package twice")
+            bb.error("Error adding the same package %s twice" % product["name"])
             return
 
     output["package"].append(data["package"][0])
@@ -218,3 +226,21 @@ def convert_cve_version(version):
 
     return version + update
 
+def decode_cve_status(d, cve):
+    """
+    Convert CVE_STATUS into status, detail and description.
+    """
+    status = d.getVarFlag("CVE_STATUS", cve)
+    if status is None:
+        return ("", "", "")
+
+    status_split = status.split(':', 1)
+    detail = status_split[0]
+    description = status_split[1].strip() if (len(status_split) > 1) else ""
+
+    status_mapping = d.getVarFlag("CVE_CHECK_STATUSMAP", detail)
+    if status_mapping is None:
+        bb.warn('Invalid detail %s for CVE_STATUS[%s] = "%s", fallback to Unpatched' % (detail, cve, status))
+        status_mapping = "Unpatched"
+
+    return (status_mapping, detail, description)

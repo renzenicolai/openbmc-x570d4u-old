@@ -137,7 +137,6 @@ RDEPENDS:packagegroup-meta-python3 = "\
     python3-flask-nav \
     python3-flask-pymongo \
     python3-flask-restful \
-    python3-flask-script \
     python3-flask-sijax \
     python3-flask-socketio \
     python3-flask-sqlalchemy \
@@ -361,7 +360,6 @@ RDEPENDS:packagegroup-meta-python3 = "\
     python3-python-vlc \
     python3-pytoml \
     python3-pytun \
-    python3-pytz-deprecation-shim \
     python3-pyudev \
     python3-pyusb \
     python3-pywbem \
@@ -438,7 +436,6 @@ RDEPENDS:packagegroup-meta-python3 = "\
     python3-txaio \
     python3-txdbus \
     python3-txws \
-    python3-typed-ast \
     python3-typeguard \
     python3-tzlocal \
     python3-u-msgpack-python \
@@ -447,6 +444,7 @@ RDEPENDS:packagegroup-meta-python3 = "\
     python3-unidiff \
     python3-uritemplate \
     python3-vcversioner \
+    python3-versioneer \
     python3-versiontools \
     python3-visitor \
     python3-waitress \

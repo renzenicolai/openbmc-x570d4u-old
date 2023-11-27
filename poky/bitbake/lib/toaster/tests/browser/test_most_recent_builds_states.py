@@ -6,13 +6,15 @@
 #
 # Copyright (C) 2013-2016 Intel Corporation
 #
-
+import time
 from django.urls import reverse
 from django.utils import timezone
 from tests.browser.selenium_helpers import SeleniumTestCase
 from tests.browser.selenium_helpers_base import Wait
 from orm.models import Project, Build, Task, Recipe, Layer, Layer_Version
 from bldcontrol.models import BuildRequest
+
+from selenium.webdriver.common.by import By
 
 class TestMostRecentBuildsStates(SeleniumTestCase):
     """ Test states update correctly in most recent builds area """
@@ -52,6 +54,7 @@ class TestMostRecentBuildsStates(SeleniumTestCase):
         build.outcome = Build.IN_PROGRESS
         build.recipes_to_parse = recipes_to_parse
         build.recipes_parsed = 0
+        build.save()
 
         build_request.state = BuildRequest.REQ_INPROGRESS
         build_request.save()
@@ -62,7 +65,7 @@ class TestMostRecentBuildsStates(SeleniumTestCase):
         element = self.wait_until_visible(selector)
 
         bar_selector = '#recipes-parsed-percentage-bar-%s' % build.id
-        bar_element = element.find_element_by_css_selector(bar_selector)
+        bar_element = element.find_element(By.CSS_SELECTOR, bar_selector)
         self.assertEqual(bar_element.value_of_css_property('width'), '0px',
             'recipe parse progress should be at 0')
 
@@ -73,7 +76,7 @@ class TestMostRecentBuildsStates(SeleniumTestCase):
         self.get(url)
 
         element = self.wait_until_visible(selector)
-        bar_element = element.find_element_by_css_selector(bar_selector)
+        bar_element = element.find_element(By.CSS_SELECTOR, bar_selector)
         recipe_bar_updated = lambda driver: \
             bar_element.get_attribute('style') == 'width: 50%;'
         msg = 'recipe parse progress bar should update to 50%'
@@ -98,7 +101,7 @@ class TestMostRecentBuildsStates(SeleniumTestCase):
             'Tasks starting', 'build should show "tasks starting" status')
 
         # first task finished; check tasks progress bar
-        task1.order = 1
+        task1.outcome = Task.OUTCOME_SUCCESS
         task1.save()
 
         self.get(url)
@@ -107,7 +110,7 @@ class TestMostRecentBuildsStates(SeleniumTestCase):
         element = self.wait_until_visible(selector)
 
         bar_selector = '#build-pc-done-bar-%s' % build.id
-        bar_element = element.find_element_by_css_selector(bar_selector)
+        bar_element = element.find_element(By.CSS_SELECTOR, bar_selector)
 
         task_bar_updated = lambda driver: \
             bar_element.get_attribute('style') == 'width: 50%;'
@@ -115,13 +118,13 @@ class TestMostRecentBuildsStates(SeleniumTestCase):
         element = Wait(self.driver).until(task_bar_updated, msg)
 
         # last task finished; check tasks progress bar updates
-        task2.order = 2
+        task2.outcome = Task.OUTCOME_SUCCESS
         task2.save()
 
         self.get(url)
 
         element = self.wait_until_visible(selector)
-        bar_element = element.find_element_by_css_selector(bar_selector)
+        bar_element = element.find_element(By.CSS_SELECTOR, bar_selector)
         task_bar_updated = lambda driver: \
             bar_element.get_attribute('style') == 'width: 100%;'
         msg = 'tasks progress bar should update to 100%'

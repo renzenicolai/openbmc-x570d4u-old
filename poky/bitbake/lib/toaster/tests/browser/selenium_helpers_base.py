@@ -21,6 +21,7 @@ import unittest
 
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.common.exceptions import NoSuchElementException, \
         StaleElementReferenceException, TimeoutException
@@ -32,9 +33,13 @@ def create_selenium_driver(cls,browser='chrome'):
         browser = env_browser
 
     if browser == 'chrome':
-        return webdriver.Chrome(
-            service_args=["--verbose", "--log-path=selenium.log"]
-        )
+        options = webdriver.ChromeOptions()
+        options.add_argument('headless')
+        options.add_argument('--disable-infobars')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--remote-debugging-port=9222')
+        return webdriver.Chrome(options=options)
     elif browser == 'firefox':
         return webdriver.Firefox()
     elif browser == 'marionette':
@@ -153,11 +158,11 @@ class SeleniumTestCaseBase(unittest.TestCase):
 
     def find(self, selector):
         """ Find single element by CSS selector """
-        return self.driver.find_element_by_css_selector(selector)
+        return self.driver.find_element(By.CSS_SELECTOR, selector)
 
     def find_all(self, selector):
         """ Find all elements matching CSS selector """
-        return self.driver.find_elements_by_css_selector(selector)
+        return self.driver.find_elements(By.CSS_SELECTOR, selector)
 
     def element_exists(self, selector):
         """

@@ -1,11 +1,11 @@
 header:
-  version: 9
+  version: 14
 
 distro: poky-tiny
 
 local_conf_header:
   hacking: |
-    TEST_SUITES = "ping"
+    TEST_SUITES = "_qemutiny ping"
   extrapackages: |
     # Intentionally blank to prevent perf from being added to the image in base.yml
 

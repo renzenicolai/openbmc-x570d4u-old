@@ -76,7 +76,7 @@ CONFIGUREOPTS = " --build=${BUILD_SYS} \
 		  --localstatedir=${localstatedir} \
 		  --libdir=${libdir} \
 		  --includedir=${includedir} \
-		  --oldincludedir=${oldincludedir} \
+		  --oldincludedir=${includedir} \
 		  --infodir=${infodir} \
 		  --mandir=${mandir} \
 		  --disable-silent-rules \
@@ -157,7 +157,7 @@ python autotools_aclocals () {
 
 do_configure[file-checksums] += "${@' '.join(siteinfo_get_files(d, sysrootcache=False)[1])}"
 
-CONFIGURE_FILES = "${S}/configure.in ${S}/configure.ac ${S}/config.h.in ${S}/acinclude.m4 Makefile.am"
+CONFIGURE_FILES = "${S}/configure.in ${S}/configure.ac ${S}/config.h.in *.m4 Makefile.am"
 
 autotools_do_configure() {
 	# WARNING: gross hack follows:

@@ -74,6 +74,15 @@ OESELFTEST_METADATA_GUESS_TABLE={
     }
 }
 
+STATUS_STRINGS = {
+    "None": "No matching test result"
+}
+
+REGRESSIONS_DISPLAY_LIMIT=50
+
+MISSING_TESTS_BANNER =   "-------------------------- Missing tests --------------------------"
+ADDITIONAL_DATA_BANNER = "--------------------- Matches and improvements --------------------"
+
 def test_has_at_least_one_matching_tag(test, tag_list):
     return "oetags" in test and any(oetag in tag_list for oetag in test["oetags"])
 
@@ -173,11 +182,34 @@ def can_be_compared(logger, base, target):
     return ret and metadata_matches(base_configuration, target_configuration) \
         and machine_matches(base_configuration, target_configuration)
 
+def get_status_str(raw_status):
+    raw_status_lower = raw_status.lower() if raw_status else "None"
+    return STATUS_STRINGS.get(raw_status_lower, raw_status)
 
-def compare_result(logger, base_name, target_name, base_result, target_result):
+def get_additional_info_line(new_pass_count, new_tests):
+    result=[]
+    if new_tests:
+        result.append(f'+{new_tests} test(s) present')
+    if new_pass_count:
+        result.append(f'+{new_pass_count} test(s) now passing')
+
+    if not result:
+        return ""
+
+    return '    -> ' + ', '.join(result) + '\n'
+
+def compare_result(logger, base_name, target_name, base_result, target_result, display_limit=None):
     base_result = base_result.get('result')
     target_result = target_result.get('result')
     result = {}
+    new_tests = 0
+    regressions = {}
+    resultstring = ""
+    new_tests = 0
+    new_pass_count = 0
+
+    display_limit = int(display_limit) if display_limit else REGRESSIONS_DISPLAY_LIMIT
+
     if base_result and target_result:
         for k in base_result:
             base_testcase = base_result[k]
@@ -189,6 +221,13 @@ def compare_result(logger, base_name, target_name, base_result, target_result):
                     result[k] = {'base': base_status, 'target': target_status}
             else:
                 logger.error('Failed to retrieved base test case status: %s' % k)
+
+        # Also count new tests that were not present in base results: it
+        # could be newly added tests, but it could also highlights some tests
+        # renames or fixed faulty ptests
+        for k in target_result:
+            if k not in base_result:
+                new_tests += 1
     if result:
         new_pass_count = sum(test['target'] is not None and test['target'].startswith("PASS") for test in result.values())
         # Print a regression report only if at least one test has a regression status (FAIL, SKIPPED, absent...)
@@ -196,14 +235,33 @@ def compare_result(logger, base_name, target_name, base_result, target_result):
             resultstring = "Regression:  %s\n             %s\n" % (base_name, target_name)
             for k in sorted(result):
                 if not result[k]['target'] or not result[k]['target'].startswith("PASS"):
-                    resultstring += '    %s: %s -> %s\n' % (k, result[k]['base'], result[k]['target'])
+                    # Differentiate each ptest kind when listing regressions
+                    key_parts = k.split('.')
+                    key = '.'.join(key_parts[:2]) if k.startswith('ptest') else key_parts[0]
+                    # Append new regression to corresponding test family
+                    regressions[key] = regressions.setdefault(key, []) + ['        %s: %s -> %s\n' % (k, get_status_str(result[k]['base']), get_status_str(result[k]['target']))]
+            resultstring += f"    Total: {sum([len(regressions[r]) for r in regressions])} new regression(s):\n"
+            for k in regressions:
+                resultstring += f"    {len(regressions[k])} regression(s) for {k}\n"
+                count_to_print=min([display_limit, len(regressions[k])]) if display_limit > 0 else len(regressions[k])
+                resultstring += ''.join(regressions[k][:count_to_print])
+                if count_to_print < len(regressions[k]):
+                    resultstring+='        [...]\n'
             if new_pass_count > 0:
                 resultstring += f'    Additionally, {new_pass_count} previously failing test(s) is/are now passing\n'
+            if new_tests > 0:
+                resultstring += f'    Additionally, {new_tests} new test(s) is/are present\n'
         else:
-            resultstring = "Improvement: %s\n             %s\n             (+%d test(s) passing)" % (base_name, target_name, new_pass_count)
+            resultstring = "%s\n%s\n" % (base_name, target_name)
             result = None
     else:
-        resultstring = "Match:       %s\n             %s" % (base_name, target_name)
+        resultstring = "%s\n%s\n" % (base_name, target_name)
+
+    if not result:
+        additional_info = get_additional_info_line(new_pass_count, new_tests)
+        if additional_info:
+            resultstring += additional_info
+
     return result, resultstring
 
 def get_results(logger, source):
@@ -261,7 +319,7 @@ def regression_common(args, logger, base_results, target_results):
                 for b in target.copy():
                     if not can_be_compared(logger, base_results[a][c], target_results[a][b]):
                         continue
-                    res, resstr = compare_result(logger, c, b, base_results[a][c], target_results[a][b])
+                    res, resstr = compare_result(logger, c, b, base_results[a][c], target_results[a][b], args.limit)
                     if not res:
                         matches.append(resstr)
                         base.remove(c)
@@ -272,15 +330,16 @@ def regression_common(args, logger, base_results, target_results):
                 for b in target:
                     if not can_be_compared(logger, base_results[a][c], target_results[a][b]):
                         continue
-                    res, resstr = compare_result(logger, c, b, base_results[a][c], target_results[a][b])
+                    res, resstr = compare_result(logger, c, b, base_results[a][c], target_results[a][b], args.limit)
                     if res:
                         regressions.append(resstr)
         else:
             notfound.append("%s not found in target" % a)
-    print("\n".join(sorted(matches)))
-    print("\n")
     print("\n".join(sorted(regressions)))
+    print("\n" + MISSING_TESTS_BANNER + "\n")
     print("\n".join(sorted(notfound)))
+    print("\n" + ADDITIONAL_DATA_BANNER + "\n")
+    print("\n".join(sorted(matches)))
     return 0
 
 def regression_git(args, logger):
@@ -384,4 +443,5 @@ def register_commands(subparsers):
     parser_build.add_argument('--commit-number', help="Revision number to search for, redundant if --commit is specified")
     parser_build.add_argument('--commit2', help="Revision to compare with")
     parser_build.add_argument('--commit-number2', help="Revision number to compare with, redundant if --commit2 is specified")
+    parser_build.add_argument('-l', '--limit', default=REGRESSIONS_DISPLAY_LIMIT, help="Maximum number of changes to display per test. Can be set to 0 to print all changes")
 

@@ -468,7 +468,6 @@ RDEPENDS:packagegroup-meta-oe-gnome ="\
     pyxdg \
     vte9 \
     gnome-theme-adwaita \
-    libxmlb \
 "
 
 RDEPENDS:packagegroup-meta-oe-graphics ="\
@@ -569,7 +568,6 @@ RDEPENDS:packagegroup-meta-oe-graphics ="\
     xclock \
     xfontsel \
     xkbprint \
-    xsetmode \
     xlsatoms \
     xlsclients \
     xlsfonts \
@@ -595,9 +593,7 @@ RDEPENDS:packagegroup-meta-oe-graphics ="\
     font-cursor-misc \
     font-misc-misc \
     xorg-fonts-100dpi \
-    liblbxutil \
     libxaw6 \
-    libxkbui \
     libxpresent \
     xcb-util-cursor \
     xserver-common \
@@ -649,11 +645,11 @@ RDEPENDS:packagegroup-meta-oe-kernel:append:powerpc64 = " libpfm4"
 RDEPENDS:packagegroup-meta-oe-kernel:remove = "kernel-selftest"
 RDEPENDS:packagegroup-meta-oe-kernel:remove:libc-musl = "bpftool crash intel-speed-select kernel-selftest minicoredumper turbostat"
 
-RDEPENDS:packagegroup-meta-oe-kernel:remove:mipsarch = "makedumpfile"
+RDEPENDS:packagegroup-meta-oe-kernel:remove:mipsarcho32 = "makedumpfile"
 RDEPENDS:packagegroup-meta-oe-kernel:remove:mips64 = "crash"
 RDEPENDS:packagegroup-meta-oe-kernel:remove:mips64el = "crash"
 
-RDEPENDS:packagegroup-meta-oe-kernel:remove:riscv64 = "crash makedumpfile oprofile"
+RDEPENDS:packagegroup-meta-oe-kernel:remove:riscv64 = "crash oprofile"
 RDEPENDS:packagegroup-meta-oe-kernel:remove:riscv32 = "crash makedumpfile oprofile"
 
 RDEPENDS:packagegroup-meta-oe-multimedia ="\
@@ -895,7 +891,6 @@ RDEPENDS:packagegroup-meta-oe-support ="\
     pcsc-lite \
     pcsc-tools \
     sharutils \
-    ${@bb.utils.contains("DISTRO_FEATURES", "x11", "toscoterm", "", d)} \
     sg3-utils \
     ${@bb.utils.contains("DISTRO_FEATURES", "x11", "uim", "", d)} \
     uchardet \
@@ -928,8 +923,8 @@ RDEPENDS:packagegroup-meta-oe-support ="\
     libmicrohttpd \
     yaml-cpp \
 "
-RDEPENDS:packagegroup-meta-oe-support:append:armv7a = " ne10"
-RDEPENDS:packagegroup-meta-oe-support:append:armv7ve = " ne10"
+RDEPENDS:packagegroup-meta-oe-support:append:armv7a = "${@bb.utils.contains("TUNE_FEATURES","neon"," ne10","",d)}"
+RDEPENDS:packagegroup-meta-oe-support:append:armv7ve = "${@bb.utils.contains("TUNE_FEATURES","neon"," ne10","",d)}"
 RDEPENDS:packagegroup-meta-oe-support:append:aarch64 = " ne10"
 RDEPENDS:packagegroup-meta-oe-support:append:x86 = " mcelog mce-inject mce-test vboxguestdrivers"
 RDEPENDS:packagegroup-meta-oe-support:append:x86-64 = " mcelog mce-inject mce-test vboxguestdrivers"

@@ -42,14 +42,14 @@ SRC_URI = "${GNU_MIRROR}/grub/grub-${PV}.tar.gz \
            file://CVE-2022-3775.patch \
            file://0001-risc-v-Handle-R_RISCV_CALL_PLT-reloc.patch \
            file://0001-fs-ext2-Ignore-checksum-seed-incompat-feature.patch \
+           file://CVE-2023-4692.patch \
+           file://CVE-2023-4693.patch \
 "
 
 SRC_URI[sha256sum] = "23b64b4c741569f9426ed2e3d0e6780796fca081bee4c99f62aa3f53ae803f5f"
 
-# Applies only to RHEL
-CVE_CHECK_IGNORE += "CVE-2019-14865"
-# Applies only to SUSE
-CVE_CHECK_IGNORE += "CVE-2021-46705"
+CVE_STATUS[CVE-2019-14865] = "not-applicable-platform: applies only to RHEL"
+CVE_STATUS[CVE-2021-46705] = "not-applicable-platform: Applies only to SUSE"
 
 DEPENDS = "flex-native bison-native gettext-native"
 

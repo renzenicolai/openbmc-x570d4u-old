@@ -14,6 +14,7 @@ from oeqa.selftest.cases.buildhistory import BuildhistoryBase
 from oeqa.core.decorator.data import skipIfMachine
 from oeqa.utils.commands import bitbake, get_bb_var, get_bb_vars
 import oeqa.utils.ftools as ftools
+from oeqa.core.decorator import OETestTag
 
 class ImageOptionsTests(OESelftestTestCase):
 
@@ -50,8 +51,6 @@ class ImageOptionsTests(OESelftestTestCase):
             loglines = "".join(f.readlines())
         self.assertIn("ccache", loglines, msg="No match for ccache in %s log.do_compile. For further details: %s" % (recipe , log_compile))
 
-    # https://bugzilla.yoctoproject.org/show_bug.cgi?id=14962
-    @skipIfMachine("qemuarm64", "fails on qemuarm64 (uses SERIAL_CONSOLES_CHECK)")
     def test_read_only_image(self):
         distro_features = get_bb_var('DISTRO_FEATURES')
         if not ('x11' in distro_features and 'opengl' in distro_features):
@@ -206,6 +205,7 @@ class ToolchainOptions(OESelftestTestCase):
         self.write_config(features)
         bitbake('fortran-helloworld')
 
+@OETestTag("yocto-mirrors")
 class SourceMirroring(OESelftestTestCase):
     # Can we download everything from the Yocto Sources Mirror over http only
     def test_yocto_source_mirror(self):

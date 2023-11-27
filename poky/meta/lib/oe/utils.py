@@ -7,6 +7,7 @@
 import subprocess
 import multiprocessing
 import traceback
+import errno
 
 def read_file(filename):
     try:
@@ -258,16 +259,23 @@ def execute_pre_post_process(d, cmds):
     if cmds is None:
         return
 
-    for cmd in cmds.strip().split(';'):
-        cmd = cmd.strip()
-        if cmd != '':
-            bb.note("Executing %s ..." % cmd)
-            bb.build.exec_func(cmd, d)
+    cmds = cmds.replace(";", " ")
 
-# For each item in items, call the function 'target' with item as the first 
+    for cmd in cmds.split():
+        bb.note("Executing %s ..." % cmd)
+        bb.build.exec_func(cmd, d)
+
+def get_bb_number_threads(d):
+    return int(d.getVar("BB_NUMBER_THREADS") or os.cpu_count() or 1)
+
+def multiprocess_launch(target, items, d, extraargs=None):
+    max_process = get_bb_number_threads(d)
+    return multiprocess_launch_mp(target, items, max_process, extraargs)
+
+# For each item in items, call the function 'target' with item as the first
 # argument, extraargs as the other arguments and handle any exceptions in the
 # parent thread
-def multiprocess_launch(target, items, d, extraargs=None):
+def multiprocess_launch_mp(target, items, max_process, extraargs=None):
 
     class ProcessLaunch(multiprocessing.Process):
         def __init__(self, *args, **kwargs):
@@ -302,7 +310,6 @@ def multiprocess_launch(target, items, d, extraargs=None):
             self.update()
             return self._result
 
-    max_process = int(d.getVar("BB_NUMBER_THREADS") or os.cpu_count() or 1)
     launched = []
     errors = []
     results = []
@@ -522,3 +529,14 @@ def directory_size(root, blocksize=4096):
         total += sum(roundup(getsize(os.path.join(root, name))) for name in files)
         total += roundup(getsize(root))
     return total
+
+# Update the mtime of a file, skip if permission/read-only issues
+def touch(filename):
+    try:
+        os.utime(filename, None)
+    except PermissionError:
+        pass
+    except OSError as e:
+        # Handle read-only file systems gracefully
+        if e.errno != errno.EROFS:
+            raise e

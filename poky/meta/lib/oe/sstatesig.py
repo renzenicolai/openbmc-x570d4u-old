@@ -104,6 +104,8 @@ class SignatureGeneratorOEBasicHashMixIn(object):
         self.lockedhashfn = {}
         self.machine = data.getVar("MACHINE")
         self.mismatch_msgs = []
+        self.mismatch_number = 0
+        self.lockedsigs_msgs = ""
         self.unlockedrecipes = (data.getVar("SIGGEN_UNLOCKED_RECIPES") or
                                 "").split()
         self.unlockedrecipes = { k: "" for k in self.unlockedrecipes }
@@ -140,9 +142,10 @@ class SignatureGeneratorOEBasicHashMixIn(object):
         super().set_taskdata(data[3:])
 
     def dump_sigs(self, dataCache, options):
-        sigfile = os.getcwd() + "/locked-sigs.inc"
-        bb.plain("Writing locked sigs to %s" % sigfile)
-        self.dump_lockedsigs(sigfile)
+        if 'lockedsigs' in options:
+            sigfile = os.getcwd() + "/locked-sigs.inc"
+            bb.plain("Writing locked sigs to %s" % sigfile)
+            self.dump_lockedsigs(sigfile)
         return super(bb.siggen.SignatureGeneratorBasicHash, self).dump_sigs(dataCache, options)
 
 
@@ -187,6 +190,7 @@ class SignatureGeneratorOEBasicHashMixIn(object):
                 #bb.warn("Using %s %s %s" % (recipename, task, h))
 
                 if h != h_locked and h_locked != unihash:
+                    self.mismatch_number += 1
                     self.mismatch_msgs.append('The %s:%s sig is computed to be %s, but the sig is locked to %s in %s'
                                           % (recipename, task, h, h_locked, var))
 
@@ -215,6 +219,9 @@ class SignatureGeneratorOEBasicHashMixIn(object):
     def dump_lockedsigs(self, sigfile, taskfilter=None):
         types = {}
         for tid in self.runtaskdeps:
+            # Bitbake changed this to a tuple in newer versions
+            if isinstance(tid, tuple):
+                tid = tid[1]
             if taskfilter:
                 if not tid in taskfilter:
                     continue
@@ -264,6 +271,15 @@ class SignatureGeneratorOEBasicHashMixIn(object):
         warn_msgs = []
         error_msgs = []
         sstate_missing_msgs = []
+        info_msgs = None
+
+        if self.lockedsigs:
+            if len(self.lockedsigs) > 10:
+                self.lockedsigs_msgs = "There are %s recipes with locked tasks (%s task(s) have non matching signature)" % (len(self.lockedsigs), self.mismatch_number)
+            else:
+                self.lockedsigs_msgs = "The following recipes have locked tasks:"
+                for pn in self.lockedsigs:
+                    self.lockedsigs_msgs += " %s" % (pn)
 
         for tid in sq_data['hash']:
             if tid not in found:
@@ -276,7 +292,9 @@ class SignatureGeneratorOEBasicHashMixIn(object):
                                                % (pn, taskname, sq_data['hash'][tid]))
 
         checklevel = d.getVar("SIGGEN_LOCKEDSIGS_TASKSIG_CHECK")
-        if checklevel == 'warn':
+        if checklevel == 'info':
+            info_msgs = self.lockedsigs_msgs
+        if checklevel == 'warn' or checklevel == 'info':
             warn_msgs += self.mismatch_msgs
         elif checklevel == 'error':
             error_msgs += self.mismatch_msgs
@@ -287,6 +305,8 @@ class SignatureGeneratorOEBasicHashMixIn(object):
         elif checklevel == 'error':
             error_msgs += sstate_missing_msgs
 
+        if info_msgs:
+            bb.note(info_msgs)
         if warn_msgs:
             bb.warn("\n".join(warn_msgs))
         if error_msgs:
@@ -321,11 +341,12 @@ def find_siginfo(pn, taskname, taskhashlist, d):
     if not taskname:
         # We have to derive pn and taskname
         key = pn
-        splitit = key.split('.bb:')
-        taskname = splitit[1]
-        pn = os.path.basename(splitit[0]).split('_')[0]
-        if key.startswith('virtual:native:'):
-            pn = pn + '-native'
+        if key.startswith("mc:"):
+           # mc:<mc>:<pn>:<task>
+           _, _, pn, taskname = key.split(':', 3)
+        else:
+           # <pn>:<task>
+           pn, taskname = key.split(':', 1)
 
     hashfiles = {}
     filedates = {}
@@ -578,9 +599,9 @@ def OEOuthashBasic(path, sigfile, task, d):
                         update_hash(" %10s" % pwd.getpwuid(s.st_uid).pw_name)
                         update_hash(" %10s" % grp.getgrgid(s.st_gid).gr_name)
                     except KeyError as e:
-                        bb.warn("KeyError in %s" % path)
                         msg = ("KeyError: %s\nPath %s is owned by uid %d, gid %d, which doesn't match "
-                            "any user/group on target. This may be due to host contamination." % (e, path, s.st_uid, s.st_gid))
+                            "any user/group on target. This may be due to host contamination." %
+                            (e, os.path.abspath(path), s.st_uid, s.st_gid))
                         raise Exception(msg).with_traceback(e.__traceback__)
 
                 if include_timestamps:

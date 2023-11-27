@@ -1,5 +1,4 @@
 SUMMARY = "C library and tools for interacting with the linux GPIO character device"
-AUTHOR = "Bartosz Golaszewski <brgl@bgdev.pl>"
 RECIPE_MAINTAINER = "Bartosz Golaszewski <brgl@bgdev.pl>"
 
 inherit autotools pkgconfig ptest
@@ -34,7 +33,6 @@ FILES:${PN}-tools += " \
 FILES:libgpiodcxx = "${libdir}/libgpiodcxx.so.*"
 
 RRECOMMENDS:${PN}-ptest += "coreutils"
-RDEPENDS:${PN}-ptest += "bats"
 
 do_install:append() {
     rm -f ${D}${bindir}/gpiod-test
@@ -51,8 +49,6 @@ do_install_ptest() {
 
     # Tools are always built so let's always install them for ptest even if
     # we're not selecting libgpiod-tools.
-    install -m 0755 ${S}/tools/gpio-tools-test ${D}${PTEST_PATH}/tests/
-    install -m 0755 ${S}/tools/gpio-tools-test.bats ${D}${PTEST_PATH}/tests/
     for tool in ${FILES:${PN}-tools}; do
         install ${B}/tools/.libs/$(basename $tool) ${D}${PTEST_PATH}/tests/
     done

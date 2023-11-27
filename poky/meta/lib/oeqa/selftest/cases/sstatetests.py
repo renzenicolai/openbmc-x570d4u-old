@@ -14,6 +14,7 @@ import re
 
 from oeqa.utils.commands import runCmd, bitbake, get_bb_var, create_temp_layer, get_bb_vars
 from oeqa.selftest.case import OESelftestTestCase
+from oeqa.core.decorator import OETestTag
 
 import oe
 import bb.siggen
@@ -188,7 +189,6 @@ class SStateBase(OESelftestTestCase):
 class SStateTests(SStateBase):
     def test_autorev_sstate_works(self):
         # Test that a git repository which changes is correctly handled by SRCREV = ${AUTOREV}
-        # when PV does not contain SRCPV
 
         tempdir = tempfile.mkdtemp(prefix='sstate_autorev')
         tempdldir = tempfile.mkdtemp(prefix='sstate_autorev_dldir')
@@ -691,3 +691,242 @@ TMPDIR = "${TOPDIR}/tmp-sstatesamehash2"
         self.maxDiff = None
         self.assertCountEqual(files1, files2)
 
+class SStateFindSiginfo(SStateBase):
+    def test_sstate_compare_sigfiles_and_find_siginfo(self):
+        """
+        Test the functionality of the find_siginfo: basic function and callback in compare_sigfiles
+        """
+        self.write_config("""
+TMPDIR = \"${TOPDIR}/tmp-sstates-findsiginfo\"
+TCLIBCAPPEND = \"\"
+MACHINE = \"qemux86-64\"
+require conf/multilib.conf
+MULTILIBS = "multilib:lib32"
+DEFAULTTUNE:virtclass-multilib-lib32 = "x86"
+BB_SIGNATURE_HANDLER = "OEBasicHash"
+""")
+        self.track_for_cleanup(self.topdir + "/tmp-sstates-findsiginfo")
+
+        pns = ["binutils", "binutils-native", "lib32-binutils"]
+        target_configs = [
+"""
+TMPVAL1 = "tmpval1"
+TMPVAL2 = "tmpval2"
+do_tmptask1() {
+    echo ${TMPVAL1}
+}
+do_tmptask2() {
+    echo ${TMPVAL2}
+}
+addtask do_tmptask1
+addtask tmptask2 before do_tmptask1
+""",
+"""
+TMPVAL3 = "tmpval3"
+TMPVAL4 = "tmpval4"
+do_tmptask1() {
+    echo ${TMPVAL3}
+}
+do_tmptask2() {
+    echo ${TMPVAL4}
+}
+addtask do_tmptask1
+addtask tmptask2 before do_tmptask1
+"""
+        ]
+
+        for target_config in target_configs:
+            self.write_recipeinc("binutils", target_config)
+            for pn in pns:
+                bitbake("%s -c do_tmptask1 -S none" % pn)
+            self.delete_recipeinc("binutils")
+
+        with bb.tinfoil.Tinfoil() as tinfoil:
+            tinfoil.prepare(config_only=True)
+
+            def find_siginfo(pn, taskname, sigs=None):
+                result = None
+                tinfoil.set_event_mask(["bb.event.FindSigInfoResult",
+                                "bb.command.CommandCompleted"])
+                ret = tinfoil.run_command("findSigInfo", pn, taskname, sigs)
+                if ret:
+                    while True:
+                        event = tinfoil.wait_event(1)
+                        if event:
+                            if isinstance(event, bb.command.CommandCompleted):
+                                break
+                            elif isinstance(event, bb.event.FindSigInfoResult):
+                                result = event.result
+                return result
+
+            def recursecb(key, hash1, hash2):
+                nonlocal recursecb_count
+                recursecb_count += 1
+                hashes = [hash1, hash2]
+                hashfiles = find_siginfo(key, None, hashes)
+                self.assertCountEqual(hashes, hashfiles)
+                bb.siggen.compare_sigfiles(hashfiles[hash1], hashfiles[hash2], recursecb)
+
+            for pn in pns:
+                recursecb_count = 0
+                filedates = find_siginfo(pn, "do_tmptask1")
+                self.assertGreaterEqual(len(filedates), 2)
+                latestfiles = sorted(filedates.keys(), key=lambda f: filedates[f])[-2:]
+                bb.siggen.compare_sigfiles(latestfiles[-2], latestfiles[-1], recursecb)
+                self.assertEqual(recursecb_count,1)
+
+class SStatePrintdiff(SStateBase):
+    def run_test_printdiff_changerecipe(self, target, change_recipe, change_bbtask, change_content, expected_sametmp_output, expected_difftmp_output):
+        self.write_config("""
+TMPDIR = "${TOPDIR}/tmp-sstateprintdiff"
+""")
+        self.track_for_cleanup(self.topdir + "/tmp-sstateprintdiff")
+        # Use runall do_build to ensure any indirect sstate is created, e.g. tzcode-native on both x86 and
+        # aarch64 hosts since only allarch target recipes depend upon it and it may not be built otherwise.
+        # A bitbake -c cleansstate tzcode-native would cause some of these tests to error for example.
+        bitbake("--runall build --runall deploy_source_date_epoch {}".format(target))
+        bitbake("-S none {}".format(target))
+        bitbake(change_bbtask)
+        self.write_recipeinc(change_recipe, change_content)
+        result_sametmp = bitbake("-S printdiff {}".format(target))
+
+        self.write_config("""
+TMPDIR = "${TOPDIR}/tmp-sstateprintdiff-2"
+""")
+        self.track_for_cleanup(self.topdir + "/tmp-sstateprintdiff-2")
+        result_difftmp = bitbake("-S printdiff {}".format(target))
+
+        self.delete_recipeinc(change_recipe)
+        for item in expected_sametmp_output:
+            self.assertIn(item, result_sametmp.output)
+        for item in expected_difftmp_output:
+            self.assertIn(item, result_difftmp.output)
+
+    def run_test_printdiff_changeconfig(self, target, change_content, expected_sametmp_output, expected_difftmp_output):
+        self.write_config("""
+TMPDIR = "${TOPDIR}/tmp-sstateprintdiff"
+""")
+        self.track_for_cleanup(self.topdir + "/tmp-sstateprintdiff")
+        bitbake("--runall build --runall deploy_source_date_epoch {}".format(target))
+        bitbake("-S none {}".format(target))
+        self.append_config(change_content)
+        result_sametmp = bitbake("-S printdiff {}".format(target))
+
+        self.write_config("""
+TMPDIR = "${TOPDIR}/tmp-sstateprintdiff-2"
+""")
+        self.append_config(change_content)
+        self.track_for_cleanup(self.topdir + "/tmp-sstateprintdiff-2")
+        result_difftmp = bitbake("-S printdiff {}".format(target))
+
+        for item in expected_sametmp_output:
+            self.assertIn(item, result_sametmp.output)
+        for item in expected_difftmp_output:
+            self.assertIn(item, result_difftmp.output)
+
+
+    # Check if printdiff walks the full dependency chain from the image target to where the change is in a specific recipe
+    def test_image_minimal_vs_quilt(self):
+        expected_output = ("Task quilt-native:do_install couldn't be used from the cache because:",
+"We need hash",
+"most recent matching task was")
+        expected_sametmp_output = expected_output + ("Variable do_install value changed",'+    echo "this changes the task signature"')
+        expected_difftmp_output = expected_output
+
+        self.run_test_printdiff_changerecipe("core-image-minimal", "quilt-native", "-c do_install quilt-native",
+"""
+do_install:append() {
+    echo "this changes the task signature"
+}
+""",
+expected_sametmp_output, expected_difftmp_output)
+
+    # Check if changes to gcc-source (which uses tmp/work-shared) are correctly discovered
+    def test_gcc_runtime_vs_gcc_source(self):
+        gcc_source_pn = 'gcc-source-%s' % get_bb_vars(['PV'], 'gcc')['PV']
+
+        expected_output = ("Task {}:do_preconfigure couldn't be used from the cache because:".format(gcc_source_pn),
+"We need hash",
+"most recent matching task was")
+        expected_sametmp_output = expected_output + ("Variable do_preconfigure value changed",'+    print("this changes the task signature")')
+        #FIXME: printdiff is supposed to find at least one preconfigure task signature in the sstate cache, but isn't able to
+        #expected_difftmp_output = expected_output
+        expected_difftmp_output = ()
+
+        self.run_test_printdiff_changerecipe("gcc-runtime", "gcc-source", "-c do_preconfigure {}".format(gcc_source_pn),
+"""
+python do_preconfigure:append() {
+    print("this changes the task signature")
+}
+""",
+expected_sametmp_output, expected_difftmp_output)
+
+    # Check if changing a really base task definiton is reported against multiple core recipes using it
+    def test_image_minimal_vs_base_do_configure(self):
+        expected_output = ("Task zstd-native:do_configure couldn't be used from the cache because:",
+"Task texinfo-dummy-native:do_configure couldn't be used from the cache because:",
+"Task ldconfig-native:do_configure couldn't be used from the cache because:",
+"Task gettext-minimal-native:do_configure couldn't be used from the cache because:",
+"Task tzcode-native:do_configure couldn't be used from the cache because:",
+"Task makedevs-native:do_configure couldn't be used from the cache because:",
+"Task pigz-native:do_configure couldn't be used from the cache because:",
+"Task update-rc.d-native:do_configure couldn't be used from the cache because:",
+"Task unzip-native:do_configure couldn't be used from the cache because:",
+"Task gnu-config-native:do_configure couldn't be used from the cache because:",
+"We need hash",
+"most recent matching task was")
+        expected_sametmp_output = expected_output + ("Variable base_do_configure value changed",'+	echo "this changes base_do_configure() definiton "')
+        expected_difftmp_output = expected_output
+
+        self.run_test_printdiff_changeconfig("core-image-minimal",
+"""
+INHERIT += "base-do-configure-modified"
+""",
+expected_sametmp_output, expected_difftmp_output)
+
+@OETestTag("yocto-mirrors")
+class SStateMirrors(SStateBase):
+    def check_bb_output(self, output, exceptions):
+        in_tasks = False
+        missing_objects = []
+        checked_urls = []
+        for l in output.splitlines():
+            if "Testing URL" in l:
+                checked_urls.append(l.split()[3])
+            if "The differences between the current build and any cached tasks start at the following tasks" in l:
+                in_tasks = True
+                continue
+            if "Writing task signature files" in l:
+                in_tasks = False
+                continue
+            if in_tasks:
+                recipe_task = l.split("/")[-1]
+                recipe, task = recipe_task.split(":")
+                for e in exceptions:
+                    if e[0] in recipe and task == e[1]:
+                        break
+                else:
+                    missing_objects.append(recipe_task)
+        self.assertTrue(len(missing_objects) == 0, "URLs checked:\n{}\nMissing objects in the cache:\n{}".format("\n".join(checked_urls), "\n".join(missing_objects)))
+
+    def run_test_cdn_mirror(self, machine, targets, exceptions):
+        exceptions = exceptions + [[t, "do_deploy_source_date_epoch"] for t in targets.split()]
+        exceptions = exceptions + [[t, "do_image_qa"] for t in targets.split()]
+        self.config_sstate(True)
+        self.append_config("""
+MACHINE = "{}"
+BB_HASHSERVE_UPSTREAM = "hashserv.yocto.io:8687"
+SSTATE_MIRRORS ?= "file://.* http://cdn.jsdelivr.net/yocto/sstate/all/PATH;downloadfilename=PATH"
+""".format(machine))
+        result = bitbake("-D -S printdiff {}".format(targets))
+        self.check_bb_output(result.output, exceptions)
+
+    def test_cdn_mirror_qemux86_64(self):
+        # Example:
+        # exceptions = [ ["packagegroup-core-sdk","do_package"] ]
+        exceptions = []
+        self.run_test_cdn_mirror("qemux86-64", "core-image-minimal core-image-full-cmdline core-image-sato-sdk", exceptions)
+
+    def test_cdn_mirror_qemuarm64(self):
+        exceptions = []
+        self.run_test_cdn_mirror("qemuarm64", "core-image-minimal core-image-full-cmdline core-image-sato-sdk", exceptions)

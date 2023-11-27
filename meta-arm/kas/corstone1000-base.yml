@@ -1,11 +1,14 @@
 header:
-  version: 11
+  version: 14
+
+env:
+  DISPLAY: ""
 
 distro: poky-tiny
 
 defaults:
   repos:
-    refspec: master
+    branch: nanbield
 
 repos:
   meta-arm:
@@ -16,16 +19,26 @@ repos:
 
   poky:
     url: https://git.yoctoproject.org/git/poky
+    commit: 2e9c2a2381105f1306bcbcb54816cbc5d8110eff
     layers:
       meta:
       meta-poky:
-      meta-yocto-bsp:
 
   meta-openembedded:
     url: https://git.openembedded.org/meta-openembedded
+    commit: 1750c66ae8e4268c472c0b2b94748a59d6ef866d
     layers:
       meta-oe:
       meta-python:
+      meta-perl:
+
+  meta-secure-core:
+    url: https://github.com/wind-river/meta-secure-core.git
+    commit: e29165a1031dcf601edbed1733cedd64826672a5
+    layers:
+      meta:
+      meta-signing-key:
+      meta-efi-secure-boot:
 
 local_conf_header:
   base: |

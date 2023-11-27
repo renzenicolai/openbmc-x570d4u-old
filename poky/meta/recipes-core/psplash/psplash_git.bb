@@ -7,7 +7,7 @@ LIC_FILES_CHKSUM = "file://psplash.h;beginline=1;endline=8;md5=8f232c1e95929eaca
 DEPENDS = "gdk-pixbuf-native"
 
 SRCREV = "44afb7506d43cca15582b4c5b90ba5580344d75d"
-PV = "0.1+git${SRCPV}"
+PV = "0.1+git"
 
 SRC_URI = "git://git.yoctoproject.org/${BPN};branch=master;protocol=https \
            file://psplash-init \
@@ -16,7 +16,7 @@ SRC_URI = "git://git.yoctoproject.org/${BPN};branch=master;protocol=https \
            ${SPLASH_IMAGES}"
 UPSTREAM_CHECK_COMMITS = "1"
 
-SPLASH_IMAGES = "file://psplash-poky-img.h;outsuffix=default"
+SPLASH_IMAGES = "file://psplash-poky-img.png;outsuffix=default"
 
 python __anonymous() {
     oldpkgs = d.getVar("PACKAGES").split()

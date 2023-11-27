@@ -5,25 +5,25 @@
 #
 
 # Zap the root password if debug-tweaks and empty-root-password features are not enabled
-ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains_any("IMAGE_FEATURES", [ 'debug-tweaks', 'empty-root-password' ], "", "zap_empty_root_password; ",d)}'
+ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains_any("IMAGE_FEATURES", [ 'debug-tweaks', 'empty-root-password' ], "", "zap_empty_root_password ",d)}'
 
 # Allow dropbear/openssh to accept logins from accounts with an empty password string if debug-tweaks or allow-empty-password is enabled
-ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains_any("IMAGE_FEATURES", [ 'debug-tweaks', 'allow-empty-password' ], "ssh_allow_empty_password; ", "",d)}'
+ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains_any("IMAGE_FEATURES", [ 'debug-tweaks', 'allow-empty-password' ], "ssh_allow_empty_password ", "",d)}'
 
 # Allow dropbear/openssh to accept root logins if debug-tweaks or allow-root-login is enabled
-ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains_any("IMAGE_FEATURES", [ 'debug-tweaks', 'allow-root-login' ], "ssh_allow_root_login; ", "",d)}'
+ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains_any("IMAGE_FEATURES", [ 'debug-tweaks', 'allow-root-login' ], "ssh_allow_root_login ", "",d)}'
 
 # Autologin the root user on the serial console, if empty-root-password and serial-autologin-root are active
-ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains("IMAGE_FEATURES", [ 'empty-root-password', 'serial-autologin-root' ], "serial_autologin_root; ", "",d)}'
+ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains("IMAGE_FEATURES", [ 'empty-root-password', 'serial-autologin-root' ], "serial_autologin_root ", "",d)}'
 
 # Enable postinst logging if debug-tweaks or post-install-logging is enabled
-ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains_any("IMAGE_FEATURES", [ 'debug-tweaks', 'post-install-logging' ], "postinst_enable_logging; ", "",d)}'
+ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains_any("IMAGE_FEATURES", [ 'debug-tweaks', 'post-install-logging' ], "postinst_enable_logging ", "",d)}'
 
 # Create /etc/timestamp during image construction to give a reasonably sane default time setting
-ROOTFS_POSTPROCESS_COMMAND += "rootfs_update_timestamp; "
+ROOTFS_POSTPROCESS_COMMAND += "rootfs_update_timestamp "
 
 # Tweak files in /etc if read-only-rootfs is enabled
-ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains("IMAGE_FEATURES", "read-only-rootfs", "read_only_rootfs_hook; ", "",d)}'
+ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains("IMAGE_FEATURES", "read-only-rootfs", "read_only_rootfs_hook ", "",d)}'
 
 # We also need to do the same for the kernel boot parameters,
 # otherwise kernel or initramfs end up mounting the rootfs read/write
@@ -34,20 +34,20 @@ ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains("IMAGE_FEATURES", "read-only
 APPEND:append = '${@bb.utils.contains("IMAGE_FEATURES", "read-only-rootfs", " ro", "", d)}'
 
 # Generates test data file with data store variables expanded in json format
-ROOTFS_POSTPROCESS_COMMAND += "write_image_test_data; "
+ROOTFS_POSTPROCESS_COMMAND += "write_image_test_data "
 
 # Write manifest
-IMAGE_MANIFEST = "${IMGDEPLOYDIR}/${IMAGE_NAME}${IMAGE_NAME_SUFFIX}.manifest"
-ROOTFS_POSTUNINSTALL_COMMAND =+ "write_image_manifest ; "
+IMAGE_MANIFEST = "${IMGDEPLOYDIR}/${IMAGE_NAME}.manifest"
+ROOTFS_POSTUNINSTALL_COMMAND =+ "write_image_manifest"
 # Set default postinst log file
 POSTINST_LOGFILE ?= "${localstatedir}/log/postinstall.log"
 # Set default target for systemd images
 SYSTEMD_DEFAULT_TARGET ?= '${@bb.utils.contains_any("IMAGE_FEATURES", [ "x11-base", "weston" ], "graphical.target", "multi-user.target", d)}'
-ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains("DISTRO_FEATURES", "systemd", "set_systemd_default_target; systemd_create_users;", "", d)}'
+ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains("DISTRO_FEATURES", "systemd", "set_systemd_default_target systemd_sysusers_check", "", d)}'
 
-ROOTFS_POSTPROCESS_COMMAND += 'empty_var_volatile;'
+ROOTFS_POSTPROCESS_COMMAND += 'empty_var_volatile'
 
-ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains("DISTRO_FEATURES", "overlayfs", "overlayfs_qa_check; overlayfs_postprocess;", "", d)}'
+ROOTFS_POSTPROCESS_COMMAND += '${@bb.utils.contains("DISTRO_FEATURES", "overlayfs", "overlayfs_qa_check overlayfs_postprocess", "", d)}'
 
 inherit image-artifact-names
 
@@ -63,35 +63,120 @@ inherit image-artifact-names
 # systemd_sysusers_create and set_user_group. Using :append is not
 # enough for that, set_user_group is added that way and would end
 # up running after us.
-SORT_PASSWD_POSTPROCESS_COMMAND ??= " tidy_shadowutils_files; "
+SORT_PASSWD_POSTPROCESS_COMMAND ??= "tidy_shadowutils_files"
 python () {
-    d.appendVar('ROOTFS_POSTPROCESS_COMMAND', '${SORT_PASSWD_POSTPROCESS_COMMAND}')
-    d.appendVar('ROOTFS_POSTPROCESS_COMMAND', 'rootfs_reproducible;')
+    d.appendVar('ROOTFS_POSTPROCESS_COMMAND', ' ${SORT_PASSWD_POSTPROCESS_COMMAND}')
+    d.appendVar('ROOTFS_POSTPROCESS_COMMAND', ' rootfs_reproducible')
 }
 
-systemd_create_users () {
-	for conffile in ${IMAGE_ROOTFS}/usr/lib/sysusers.d/*.conf; do
-		[ -e $conffile ] || continue
-		grep -v "^#" $conffile | sed -e '/^$/d' | while read type name id comment; do
-		if [ "$type" = "u" ]; then
-			useradd_params="--shell /sbin/nologin"
-			[ "$id" != "-" ] && useradd_params="$useradd_params --uid $id"
-			[ "$comment" != "-" ] && useradd_params="$useradd_params --comment $comment"
-			useradd_params="$useradd_params --system $name"
-			eval useradd --root ${IMAGE_ROOTFS} $useradd_params || true
-		elif [ "$type" = "g" ]; then
-			groupadd_params=""
-			[ "$id" != "-" ] && groupadd_params="$groupadd_params --gid $id"
-			groupadd_params="$groupadd_params --system $name"
-			eval groupadd --root ${IMAGE_ROOTFS} $groupadd_params || true
-		elif [ "$type" = "m" ]; then
-			group=$id
-			eval groupadd --root ${IMAGE_ROOTFS} --system $group || true
-			eval useradd --root ${IMAGE_ROOTFS} --shell /sbin/nologin --system $name --no-user-group || true
-			eval usermod --root ${IMAGE_ROOTFS} -a -G $group $name
-		fi
-		done
-	done
+# Resolve the ID as described in the sysusers.d(5) manual: ID can be a numeric
+# uid, a couple uid:gid or uid:groupname or it is '-' meaning leaving it
+# automatic or it can be a path. In the latter, the uid/gid matches the
+# user/group owner of that file.
+def resolve_sysusers_id(d, sid):
+    # If the id is a path, the uid/gid matchs to the target's uid/gid in the
+    # rootfs.
+    if '/' in sid:
+        try:
+            osstat = os.stat(os.path.join(d.getVar('IMAGE_ROOTFS'), sid))
+        except FileNotFoundError:
+            bb.error('sysusers.d: file %s is required but it does not exist in the rootfs', sid)
+            return ('-', '-')
+        return (osstat.st_uid, osstat.st_gid)
+    # Else it is a uid:gid or uid:groupname syntax
+    if ':' in sid:
+        return sid.split(':')
+    else:
+        return (sid, '-')
+
+# Check a user exists in the rootfs password file and return its properties
+def check_user_exists(d, uname=None, uid=None):
+    with open(os.path.join(d.getVar('IMAGE_ROOTFS'), 'etc/passwd'), 'r') as pwfile:
+        for line in pwfile:
+            (name, _, u_id, gid, comment, homedir, ushell) = line.strip().split(':')
+            if uname == name or uid == u_id:
+                return (name, u_id, gid, comment or '-', homedir or '/', ushell or '-')
+    return None
+
+# Check a group exists in the rootfs group file and return its properties
+def check_group_exists(d, gname=None, gid=None):
+    with open(os.path.join(d.getVar('IMAGE_ROOTFS'), 'etc/group'), 'r') as gfile:
+        for line in gfile:
+            (name, _, g_id, _) = line.strip().split(':')
+            if name == gname or g_id == gid:
+                return (name, g_id)
+    return None
+
+def compare_users(user, e_user):
+    # user and e_user must not have None values. Unset values must be '-'.
+    (name, uid, gid, comment, homedir, ushell) = user
+    (e_name, e_uid, e_gid, e_comment, e_homedir, e_ushell) = e_user
+    # Ignore 'uid', 'gid' or 'comment' if they are not set
+    # Ignore 'shell' and 'ushell' if one is not set
+    return name == e_name \
+        and (uid == '-' or uid == e_uid) \
+        and (gid == '-' or gid == e_gid) \
+        and (comment == '-' or e_comment == '-' or comment.lower() == e_comment.lower()) \
+        and (homedir == '-' or e_homedir == '-' or homedir == e_homedir) \
+        and (ushell == '-' or e_ushell == '-' or ushell == e_ushell)
+
+# Open sysusers.d configuration files and parse each line to check the users and
+# groups are already defined in /etc/passwd and /etc/groups with similar
+# properties. Refer to the sysusers.d(5) manual for its syntax.
+python systemd_sysusers_check() {
+    import glob
+    import re
+
+    pattern_comment = r'(-|\"[^:\"]+\")'
+    pattern_word    = r'[^\s]+'
+    pattern_line   = r'(' + pattern_word + r')\s+(' + pattern_word + r')\s+(' + pattern_word + r')(\s+' \
+        + pattern_comment + r')?' + r'(\s+(' + pattern_word + r'))?' + r'(\s+(' + pattern_word + r'))?'
+
+    for conffile in glob.glob(os.path.join(d.getVar('IMAGE_ROOTFS'), 'usr/lib/sysusers.d/*.conf')):
+        with open(conffile, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not len(line) or line[0] == '#': continue
+                ret = re.fullmatch(pattern_line, line.strip())
+                if not ret: continue
+                (stype, sname, sid, _, scomment, _, shomedir, _, sshell) = ret.groups()
+                if stype == 'u':
+                    if sid:
+                        (suid, sgid) = resolve_sysusers_id(d, sid)
+                        if sgid.isalpha():
+                            sgid = check_group_exists(d, gname=sgid)
+                        elif sgid.isdigit():
+                            check_group_exists(d, gid=sgid)
+                        else:
+                            sgid = '-'
+                    else:
+                        suid = '-'
+                        sgid = '-'
+                    scomment = scomment.replace('"', '') if scomment else '-'
+                    shomedir = shomedir or '-'
+                    sshell = sshell or '-'
+                    e_user = check_user_exists(d, uname=sname)
+                    if not e_user:
+                        bb.warn('User %s has never been defined' % sname)
+                    elif not compare_users((sname, suid, sgid, scomment, shomedir, sshell), e_user):
+                        bb.warn('User %s has been defined as (%s) but sysusers.d expects it as (%s)'
+                                % (sname, ', '.join(e_user),
+                                ', '.join((sname, suid, sgid, scomment, shomedir, sshell))))
+                elif stype == 'g':
+                    gid = sid or '-'
+                    if '/' in gid:
+                        (_, gid) = resolve_sysusers_id(d, sid)
+                    e_group = check_group_exists(d, gname=sname)
+                    if not e_group:
+                        bb.warn('Group %s has never been defined' % sname)
+                    elif gid != '-':
+                        (_, e_gid) = e_group
+                        if gid != e_gid:
+                            bb.warn('Group %s has been defined with id (%s) but sysusers.d expects gid (%s)'
+                                    % (sname, e_gid, gid))
+                elif stype == 'm':
+                    check_user_exists(d, sname)
+                    check_group_exists(d, sid)
 }
 
 #
@@ -156,10 +241,10 @@ read_only_rootfs_hook () {
 #
 zap_empty_root_password () {
 	if [ -e ${IMAGE_ROOTFS}/etc/shadow ]; then
-		sed -i 's%^root::%root:*:%' ${IMAGE_ROOTFS}/etc/shadow
+		sed --follow-symlinks -i 's%^root::%root:*:%' ${IMAGE_ROOTFS}/etc/shadow
         fi
 	if [ -e ${IMAGE_ROOTFS}/etc/passwd ]; then
-		sed -i 's%^root::%root:*:%' ${IMAGE_ROOTFS}/etc/passwd
+		sed --follow-symlinks -i 's%^root::%root:*:%' ${IMAGE_ROOTFS}/etc/passwd
 	fi
 }
 

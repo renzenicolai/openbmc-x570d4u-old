@@ -65,7 +65,7 @@ class Command:
         command = commandline.pop(0)
 
         # Ensure cooker is ready for commands
-        if command != "updateConfig" and command != "setFeatures":
+        if command not in ["updateConfig", "setFeatures", "ping"]:
             try:
                 self.cooker.init_configdata()
                 if not self.remotedatastores:
@@ -85,7 +85,6 @@ class Command:
                 if not hasattr(command_method, 'readonly') or not getattr(command_method, 'readonly'):
                     return None, "Not able to execute not readonly commands in readonly mode"
             try:
-                self.cooker.process_inotify_updates_apply()
                 if getattr(command_method, 'needconfig', True):
                     self.cooker.updateCacheSync()
                 result = command_method(self, commandline)
@@ -109,7 +108,6 @@ class Command:
 
     def runAsyncCommand(self, _, process_server, halt):
         try:
-            self.cooker.process_inotify_updates_apply()
             if self.cooker.state in (bb.cooker.state.error, bb.cooker.state.shutdown, bb.cooker.state.forceshutdown):
                 # updateCache will trigger a shutdown of the parser
                 # and then raise BBHandledException triggering an exit
@@ -169,6 +167,8 @@ class CommandsSync:
         Allow a UI to check the server is still alive
         """
         return "Still alive!"
+    ping.needconfig = False
+    ping.readonly = True
 
     def stateShutdown(self, command, params):
         """
@@ -306,6 +306,11 @@ class CommandsSync:
             ret.append((collection, pattern, regex.pattern, pri))
         return ret
     getLayerPriorities.readonly = True
+
+    def revalidateCaches(self, command, params):
+        """Called by UI clients when metadata may have changed"""
+        command.cooker.revalidateCaches()
+    parseConfiguration.needconfig = False
 
     def getRecipes(self, command, params):
         try:
@@ -545,8 +550,8 @@ class CommandsSync:
         and return a datastore object representing the environment
         for the recipe.
         """
-        fn = params[0]
-        mc = bb.runqueue.mc_from_tid(fn)
+        virtualfn = params[0]
+        (fn, cls, mc) = bb.cache.virtualfn2realfn(virtualfn)
         appends = params[1]
         appendlist = params[2]
         if len(params) > 3:
@@ -569,10 +574,10 @@ class CommandsSync:
         if config_data:
             # We have to use a different function here if we're passing in a datastore
             # NOTE: we took a copy above, so we don't do it here again
-            envdata = command.cooker.databuilder._parse_recipe(config_data, fn, appendfiles, mc, layername)['']
+            envdata = command.cooker.databuilder._parse_recipe(config_data, fn, appendfiles, mc, layername)[cls]
         else:
             # Use the standard path
-            envdata = command.cooker.databuilder.parseRecipe(fn, appendfiles, layername)
+            envdata = command.cooker.databuilder.parseRecipe(virtualfn, appendfiles, layername)
         idx = command.remotedatastores.store(envdata)
         return DataStoreConnectionHandle(idx)
     parseRecipeFile.readonly = True
@@ -776,3 +781,9 @@ class CommandsAsync:
         bb.event.fire(bb.event.FindSigInfoResult(res), command.cooker.databuilder.mcdata[mc])
         command.finishAsyncCommand()
     findSigInfo.needcache = False
+
+    def getTaskSignatures(self, command, params):
+        res = command.cooker.getTaskSignatures(params[0], params[1])
+        bb.event.fire(bb.event.GetTaskSignatureResult(res), command.cooker.data)
+        command.finishAsyncCommand()
+    getTaskSignatures.needcache = True

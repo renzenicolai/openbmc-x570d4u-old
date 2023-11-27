@@ -567,6 +567,8 @@ def _extract_source(srctree, keep_temp, devbranch, sync, config, basepath, works
         logger.debug('writing append file %s' % appendfile)
         with open(appendfile, 'a') as f:
             f.write('###--- _extract_source\n')
+            f.write('deltask do_recipe_qa\n')
+            f.write('deltask do_recipe_qa_setscene\n')
             f.write('ERROR_QA:remove = "patch-fuzz"\n')
             f.write('DEVTOOL_TEMPDIR = "%s"\n' % tempdir)
             f.write('DEVTOOL_DEVBRANCH = "%s"\n' % devbranch)
@@ -585,6 +587,7 @@ def _extract_source(srctree, keep_temp, devbranch, sync, config, basepath, works
         preservestampfile = os.path.join(sstate_manifests, 'preserve-stamps')
         with open(preservestampfile, 'w') as f:
             f.write(d.getVar('STAMP'))
+        tinfoil.modified_files()
         try:
             if is_kernel_yocto:
                 # We need to generate the kernel config
@@ -968,9 +971,9 @@ def modify(args, config, basepath, workspace):
                         '}\n')
             if rd.getVarFlag('do_menuconfig','task'):
                 f.write('\ndo_configure:append() {\n'
-                '    if [ ! ${DEVTOOL_DISABLE_MENUCONFIG} ]; then\n'
-                '        cp ${B}/.config ${S}/.config.baseline\n'
-                '        ln -sfT ${B}/.config ${S}/.config.new\n'
+                '    if [ ${@ oe.types.boolean(\'${KCONFIG_CONFIG_ENABLE_MENUCONFIG}\') } = True ]; then\n'
+                '        cp ${KCONFIG_CONFIG_ROOTDIR}/.config ${S}/.config.baseline\n'
+                '        ln -sfT ${KCONFIG_CONFIG_ROOTDIR}/.config ${S}/.config.new\n'
                 '    fi\n'
                 '}\n')
             if initial_rev:
@@ -1629,7 +1632,7 @@ def _update_recipe_patch(recipename, workspace, srctree, rd, appendlayerdir, wil
     else:
         patchdir_params = {'patchdir': relpatchdir}
 
-    def srcuri_entry(fname):
+    def srcuri_entry(basepath):
         if patchdir_params:
             paramstr = ';' + ';'.join('%s=%s' % (k,v) for k,v in patchdir_params.items())
         else:

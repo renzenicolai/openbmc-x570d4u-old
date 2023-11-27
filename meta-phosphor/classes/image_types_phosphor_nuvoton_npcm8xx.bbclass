@@ -30,9 +30,11 @@ python do_pad_binary() {
     TIP_IMAGE = d.getVar('TIP_IMAGE', True)
     def Pad_bin_file_inplace(inF, align):
         padding_size = 0
-        padding_size_end = 0
 
         F_size = os.path.getsize(inF)
+
+        if ((F_size % align) == 0):
+            return
 
         padding_size = align - (F_size % align)
 
@@ -91,9 +93,9 @@ check_keys() {
     fi
 }
 
-# Sign images for secure os be enabled
+# Sign images for secure os be enabled and TIP mode only
 do_sign_binary() {
-    if [ "${SECURED_IMAGE}" != "True" ]; then
+    if [ "${SECURED_IMAGE}" != "True" -o "${TIP_IMAGE}" != "True" ]; then
        return
     fi
     checked=`check_keys`
@@ -218,7 +220,7 @@ python do_merge_bootloaders() {
 }
 
 do_pad_binary[depends] += " \
-    npcm8xx-tip-fw:do_deploy \
+    ${@'npcm8xx-tip-fw:do_deploy' if d.getVar('TIP_IMAGE', True) == 'True' else ''} \
     npcm8xx-bootblock:do_deploy \
     u-boot-nuvoton:do_deploy \
     trusted-firmware-a:do_deploy \

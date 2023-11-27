@@ -12,6 +12,7 @@ PACKAGES = "\
     packagegroup-security-audit \
     packagegroup-security-ids  \
     packagegroup-security-mac  \
+    packagegroup-security-compliance  \
     ${@bb.utils.contains("DISTRO_FEATURES", "ptest", "packagegroup-meta-security-ptest-packages", "", d)} \
     "
 
@@ -21,6 +22,7 @@ RDEPENDS:packagegroup-core-security = "\
     packagegroup-security-audit \
     packagegroup-security-ids  \
     packagegroup-security-mac  \
+    packagegroup-security-compliance  \
     ${@bb.utils.contains("DISTRO_FEATURES", "ptest", "packagegroup-meta-security-ptest-packages", "", d)} \
     "
 
@@ -38,7 +40,6 @@ RDEPENDS:packagegroup-security-utils = "\
     pinentry \
     softhsm \
     sshguard \
-    firejail \
     ${@bb.utils.contains_any("TUNE_FEATURES", "riscv32 ", "", " libseccomp",d)} \
     ${@bb.utils.contains("DISTRO_FEATURES", "pam", "google-authenticator-libpam", "",d)} \
     ${@bb.utils.contains("DISTRO_FEATURES", "pax", "pax-utils packctl", "",d)} \
@@ -46,9 +47,8 @@ RDEPENDS:packagegroup-security-utils = "\
 
 have_krill =  "${@bb.utils.contains("DISTRO_FEATURES", "pam", "krill", "",d)}"
 RDEPENDS:packagegroup-security-utils:append:x86 = " chipsec ${have_krill}"
-RDEPENDS:packagegroup-security-utils:append:x86-64 = " chipsec ${have_krill}"
-RDEPENDS:packagegroup-security-utils:append:aarch64 = " ${have_krill}"
-RDEPENDS:packagegroup-security-utils:remove:mipsarch = "firejail"
+RDEPENDS:packagegroup-security-utils:append:x86-64 = " firejail chipsec ${have_krill}"
+RDEPENDS:packagegroup-security-utils:append:aarch64 = " firejail ${have_krill}"
 RDEPENDS:packagegroup-security-utils:remove:libc-musl = "krill"
 
 SUMMARY:packagegroup-security-scanners = "Security scanners"
@@ -90,6 +90,16 @@ RDEPENDS:packagegroup-security-mac = " \
     "
 
 RDEPENDS:packagegroup-security-mac:remove:mipsarch = "apparmor"
+
+SUMMARY:packagegroup-security-compliance = "Security Compliance applications"
+RDEPENDS:packagegroup-security-compliance = " \
+    lynis \
+    openscap \
+    scap-security-guide \
+    os-release \
+    "
+
+RDEPENDS:packagegroup-security-compliance:remove:libc-musl = "openscap scap-security-guide"
 
 RDEPENDS:packagegroup-meta-security-ptest-packages = "\
     ptest-runner \

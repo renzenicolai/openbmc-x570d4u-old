@@ -46,7 +46,6 @@ IMAGE_TYPEDEP:mmc-ext4-tar = "${FLASH_EXT4_BASETYPE}"
 
 # Flash characteristics in KB unless otherwise noted
 DISTROOVERRIDES .= ":flash-${FLASH_SIZE}"
-FLASH_SIZE ?= "32768"
 FLASH_PEB_SIZE ?= "64"
 # Flash page and overhead sizes in bytes
 FLASH_PAGE_SIZE ?= "1"
@@ -92,6 +91,8 @@ SIGNING_KEY_DEPENDS = "${@oe.utils.conditional('INSECURE_KEY', 'True', 'phosphor
 VERSION_PURPOSE ?= "xyz.openbmc_project.Software.Version.VersionPurpose.BMC"
 
 UBOOT_SUFFIX ?= "bin"
+
+IMAGE_NAME_SUFFIX=""
 
 python() {
     # Compute rwfs LEB count and LEB size.
@@ -356,7 +357,7 @@ do_generate_static[depends] += " \
 make_signatures() {
     signing_key="${SIGNING_KEY}"
 
-    if [ "${INSECURE_KEY}" == "True" ] && [ -n "${SIGNING_PUBLIC_KEY}" ]; then
+    if [ "${INSECURE_KEY}" = "True" ] && [ -n "${SIGNING_PUBLIC_KEY}" ]; then
         echo "Using SIGNING_PUBLIC_KEY"
         signing_key=""
     fi

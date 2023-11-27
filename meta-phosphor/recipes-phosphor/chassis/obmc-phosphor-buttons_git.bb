@@ -5,10 +5,11 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 DEPENDS += " \
     systemd \
     sdbusplus \
+    sdeventplus \
     phosphor-dbus-interfaces \
     phosphor-logging \
     "
-SRCREV = "0d038f58f7ae2d8484ef2ba13116042088f133ff"
+SRCREV = "615381479fa4faeee76af38f9d7b61dc76f8f631"
 PACKAGECONFIG ??= "signals handler"
 PACKAGECONFIG[signals] = ",,gpioplus nlohmann-json,"
 PACKAGECONFIG[handler] = ",,,${VIRTUAL-RUNTIME_obmc-host-state-manager} ${VIRTUAL-RUNTIME_obmc-chassis-state-manager}"

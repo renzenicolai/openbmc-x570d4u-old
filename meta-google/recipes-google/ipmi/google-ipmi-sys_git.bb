@@ -19,12 +19,13 @@ DEPENDS += " \
 
 S = "${WORKDIR}/git"
 SRC_URI = "git://github.com/openbmc/google-ipmi-sys;branch=master;protocol=https"
-SRCREV = "444b5ea4847ea7c014114094d4b63672122f9786"
+SRCREV = "40b2a0cc10cf188cb904282c2d4004e146a021b7"
 
 FILES:${PN} += "${libdir}/ipmid-providers"
 
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE:${PN} += " \
+  gbmc-bare-metal-active.target \
   gbmc-host-poweroff.target \
   gbmc-psu-hardreset.target \
   gbmc-psu-hardreset-pre.target \
@@ -33,5 +34,7 @@ SYSTEMD_SERVICE:${PN} += " \
 
 EXTRA_OEMESON += "-Dtests=disabled"
 
+GBMC_NCSI_IPMI_CHANNEL ??= "1"
+
 CXXFLAGS:append:gbmc = '${@"" if not d.getVar("GBMC_NCSI_IF_NAME") else \
-  " -DNCSI_IPMI_CHANNEL=1 -DNCSI_IF_NAME=" + d.getVar("GBMC_NCSI_IF_NAME")}'
+  " -DNCSI_IPMI_CHANNEL=" + d.getVar("GBMC_NCSI_IPMI_CHANNEL") + " -DNCSI_IF_NAME=" + d.getVar("GBMC_NCSI_IF_NAME")}'

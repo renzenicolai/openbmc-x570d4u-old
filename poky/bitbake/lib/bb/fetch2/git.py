@@ -48,9 +48,22 @@ Supported SRC_URI options are:
    instead of branch.
    The default is "0", set nobranch=1 if needed.
 
+- subpath
+   Limit the checkout to a specific subpath of the tree.
+   By default, checkout the whole tree, set subpath=<path> if needed
+
+- destsuffix
+   The name of the path in which to place the checkout.
+   By default, the path is git/, set destsuffix=<suffix> if needed
+
 - usehead
    For local git:// urls to use the current branch HEAD as the revision for use with
    AUTOREV. Implies nobranch.
+
+- lfs
+    Enable the checkout to use LFS for large files. This will download all LFS files
+    in the download step, as the unpack step does not have network access.
+    The default is "1", set lfs=0 to skip.
 
 """
 
@@ -65,6 +78,7 @@ import fnmatch
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import tempfile
 import bb
@@ -365,8 +379,32 @@ class Git(FetchMethod):
                 runfetchcmd(fetch_cmd, d, workdir=ud.clonedir)
         repourl = self._get_repo_url(ud)
 
+        needs_clone = False
+        if os.path.exists(ud.clonedir):
+            # The directory may exist, but not be the top level of a bare git
+            # repository in which case it needs to be deleted and re-cloned.
+            try:
+                # Since clones can be bare, use --absolute-git-dir instead of --show-toplevel
+                output = runfetchcmd("LANG=C %s rev-parse --absolute-git-dir" % ud.basecmd, d, workdir=ud.clonedir)
+                toplevel = output.rstrip()
+
+                if not bb.utils.path_is_descendant(toplevel, ud.clonedir):
+                    logger.warning("Top level directory '%s' is not a descendant of '%s'. Re-cloning", toplevel, ud.clonedir)
+                    needs_clone = True
+            except bb.fetch2.FetchError as e:
+                logger.warning("Unable to get top level for %s (not a git directory?): %s", ud.clonedir, e)
+                needs_clone = True
+            except FileNotFoundError as e:
+                logger.warning("%s", e)
+                needs_clone = True
+
+            if needs_clone:
+                shutil.rmtree(ud.clonedir)
+        else:
+            needs_clone = True
+
         # If the repo still doesn't exist, fallback to cloning it
-        if not os.path.exists(ud.clonedir):
+        if needs_clone:
             # We do this since git will use a "-l" option automatically for local urls where possible,
             # but it doesn't work when git/objects is a symlink, only works when it is a directory.
             if repourl.startswith("file://"):
@@ -437,8 +475,8 @@ class Git(FetchMethod):
                 # Only do this if the unpack resulted in a .git/lfs directory being
                 # created; this only happens if at least one blob needed to be
                 # downloaded.
-                if os.path.exists(os.path.join(tmpdir, "git", ".git", "lfs")):
-                    runfetchcmd("tar -cf - lfs | tar -xf - -C %s" % ud.clonedir, d, workdir="%s/git/.git" % tmpdir)
+                if os.path.exists(os.path.join(ud.destdir, ".git", "lfs")):
+                    runfetchcmd("tar -cf - lfs | tar -xf - -C %s" % ud.clonedir, d, workdir="%s/.git" % ud.destdir)
 
     def build_mirror_data(self, ud, d):
 
@@ -564,6 +602,8 @@ class Git(FetchMethod):
         destdir = ud.destdir = os.path.join(destdir, destsuffix)
         if os.path.exists(destdir):
             bb.utils.prunedir(destdir)
+        if not ud.bareclone:
+            ud.unpack_tracer.unpack("git", destdir)
 
         need_lfs = self._need_lfs(ud)
 
@@ -602,6 +642,8 @@ class Git(FetchMethod):
                 raise bb.fetch2.FetchError("Repository %s has LFS content, install git-lfs on host to download (or set lfs=0 to ignore it)" % (repourl))
             elif not need_lfs:
                 bb.note("Repository %s has LFS content but it is not being fetched" % (repourl))
+            else:
+                runfetchcmd("%s lfs install" % ud.basecmd, d, workdir=destdir)
 
         if not ud.nocheckout:
             if subpath:
@@ -661,8 +703,11 @@ class Git(FetchMethod):
         Check if the repository has 'lfs' (large file) content
         """
 
-        # The bare clonedir doesn't use the remote names; it has the branch immediately.
-        if wd == ud.clonedir:
+        if ud.nobranch:
+            # If no branch is specified, use the current git commit
+            refname = self._build_revision(ud, d, ud.names[0])
+        elif wd == ud.clonedir:
+            # The bare clonedir doesn't use the remote names; it has the branch immediately.
             refname = ud.branches[ud.names[0]]
         else:
             refname = "origin/%s" % ud.branches[ud.names[0]]

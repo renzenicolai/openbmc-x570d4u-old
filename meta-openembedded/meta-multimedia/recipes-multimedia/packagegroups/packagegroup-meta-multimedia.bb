@@ -25,9 +25,6 @@ RDEPENDS:packagegroup-meta-multimedia = "\
     bluealsa \
     caps \
     cdparanoia \
-    dleyna-connector-dbus \
-    dleyna-renderer \
-    dleyna-server \
     dvb-apps \
     ${@bb.utils.contains("LICENSE_FLAGS_ACCEPTED", "commercial", "faac mpd", "", d)} \
     gerbera \
@@ -44,7 +41,7 @@ RDEPENDS:packagegroup-meta-multimedia = "\
     bigbuckbunny-720p \
     tearsofsteel-1080p \
     pipewire \
-    ${@bb.utils.contains("LICENSE_FLAGS_ACCEPTED", "commercial", "projucer", "", d)} \
+    ${@bb.utils.contains("LICENSE_FLAGS_ACCEPTED", "commercial", bb.utils.contains("DISTRO_FEATURES", "x11", "projucer", "", d), "", d)} \
     libcamera \
     vorbis-tools \
     libopenmpt \

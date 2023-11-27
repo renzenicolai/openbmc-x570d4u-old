@@ -8,14 +8,16 @@ DEPENDS = "libxml2 glib-2.0 swig python3"
 
 inherit autotools pkgconfig python3native python3targetconfig
 
-PV = "2.3.0"
+PV = "2.3.0+git${SRCPV}"
 
-SRCREV = "72480212cd8ec0ab8d0b5064df52c146cac603b4"
+SRCREV = "2cd858c679d25633077ca78b67182a9b77653816"
 SRC_URI = "git://github.com/libimobiledevice/libplist;protocol=https;branch=master"
 
 S = "${WORKDIR}/git"
 
-CVE_CHECK_IGNORE += "\
+CVE_STATUS_GROUPS += "CVE_STATUS_LIBLIST"
+CVE_STATUS_LIBLIST[status] = "fixed-version: The CPE in the NVD database doesn't reflect correctly the vulnerable versions."
+CVE_STATUS_LIBLIST = " \
     CVE-2017-5834 \
     CVE-2017-5835 \
     CVE-2017-5836 \

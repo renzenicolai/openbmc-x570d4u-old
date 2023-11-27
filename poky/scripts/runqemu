@@ -198,12 +198,14 @@ class BaseConfig(object):
         self.snapshot = False
         self.wictypes = ('wic', 'wic.vmdk', 'wic.qcow2', 'wic.vdi', "wic.vhd", "wic.vhdx")
         self.fstypes = ('ext2', 'ext3', 'ext4', 'jffs2', 'nfs', 'btrfs',
-                        'cpio.gz', 'cpio', 'ramfs', 'tar.bz2', 'tar.gz')
+                        'cpio.gz', 'cpio', 'ramfs', 'tar.bz2', 'tar.gz',
+                        'squashfs', 'squashfs-xz', 'squashfs-lzo',
+                        'squashfs-lz4', 'squashfs-zst')
         self.vmtypes = ('hddimg', 'iso')
         self.fsinfo = {}
         self.network_device = "-device e1000,netdev=net0,mac=@MAC@"
         self.cmdline_ip_slirp = "ip=dhcp"
-        self.cmdline_ip_tap = "ip=192.168.7.@CLIENT@::192.168.7.@GATEWAY@:255.255.255.0::eth0:off:8.8.8.8"
+        self.cmdline_ip_tap = "ip=192.168.7.@CLIENT@::192.168.7.@GATEWAY@:255.255.255.0::eth0:off:8.8.8.8 net.ifnames=0"
         # Use different mac section for tap and slirp to avoid
         # conflicts, e.g., when one is running with tap, the other is
         # running with slirp.
@@ -648,10 +650,10 @@ to your build configuration.
                         elif fsflag == 'kernel-in-fs':
                             wic_fs = False
                         else:
-                            logger.warn('Unknown flag "%s:%s" in QB_FSINFO', fstype, fsflag)
+                            logger.warning('Unknown flag "%s:%s" in QB_FSINFO', fstype, fsflag)
                             continue
                     else:
-                        logger.warn('QB_FSINFO is not supported for image type "%s"', fstype)
+                        logger.warning('QB_FSINFO is not supported for image type "%s"', fstype)
                         continue
 
                     if fstype in self.fsinfo:
@@ -842,11 +844,11 @@ to your build configuration.
             if self.get('QB_TCPSERIAL_OPT'):
                 self.qemu_opt_script += ' ' + self.get('QB_TCPSERIAL_OPT').replace('@PORT@', port)
             else:
-                self.qemu_opt_script += ' -serial tcp:127.0.0.1:%s' % port
+                self.qemu_opt_script += ' -serial tcp:127.0.0.1:%s,nodelay=on' % port
 
             if len(ports) > 1:
                 for port in ports[1:]:
-                    self.qemu_opt_script += ' -serial tcp:127.0.0.1:%s' % port
+                    self.qemu_opt_script += ' -serial tcp:127.0.0.1:%s,nodelay=on' % port
 
     def check_and_set(self):
         """Check configs sanity and set when needed"""
@@ -1015,17 +1017,14 @@ to your build configuration.
             else:
                 self.nfs_server = '192.168.7.@GATEWAY@'
 
-        # Figure out a new nfs_instance to allow multiple qemus running.
-        ps = subprocess.check_output(("ps", "auxww")).decode('utf-8')
-        pattern = '/bin/unfsd .* -i .*\.pid -e .*/exports([0-9]+) '
-        all_instances = re.findall(pattern, ps, re.M)
-        if all_instances:
-            all_instances.sort(key=int)
-            self.nfs_instance = int(all_instances.pop()) + 1
+        nfsd_port = 3048 + self.nfs_instance
+        lockdir = "/tmp/qemu-port-locks"
+        self.make_lock_dir(lockdir)
+        while not self.check_free_port('localhost', nfsd_port, lockdir):
+            self.nfs_instance += 1
+            nfsd_port += 1
 
-        nfsd_port = 3049 + 2 * self.nfs_instance
-        mountd_port = 3048 + 2 * self.nfs_instance
-
+        mountd_port = nfsd_port
         # Export vars for runqemu-export-rootfs
         export_dict = {
             'NFS_INSTANCE': self.nfs_instance,
@@ -1087,6 +1086,17 @@ to your build configuration.
         self.set('NETWORK_CMD', '-netdev bridge,br=%s,id=net0,helper=%s -device virtio-net-pci,netdev=net0 ' % (
             self.net_bridge, os.path.join(self.bindir_native, 'qemu-oe-bridge-helper')))
 
+    def make_lock_dir(self, lockdir):
+        if not os.path.exists(lockdir):
+            # There might be a race issue when multi runqemu processess are
+            # running at the same time.
+            try:
+                os.mkdir(lockdir)
+                os.chmod(lockdir, 0o777)
+            except FileExistsError:
+                pass
+        return
+
     def setup_slirp(self):
         """Setup user networking"""
 
@@ -1105,14 +1115,7 @@ to your build configuration.
         mac = 2
 
         lockdir = "/tmp/qemu-port-locks"
-        if not os.path.exists(lockdir):
-            # There might be a race issue when multi runqemu processess are
-            # running at the same time.
-            try:
-                os.mkdir(lockdir)
-                os.chmod(lockdir, 0o777)
-            except FileExistsError:
-                pass
+        self.make_lock_dir(lockdir)
 
         # Find a free port to avoid conflicts
         for p in ports[:]:
@@ -1152,20 +1155,17 @@ to your build configuration.
             logger.error("ip: %s" % ip)
             raise OEPathError("runqemu-ifup, runqemu-ifdown or ip not found")
 
-        if not os.path.exists(lockdir):
-            # There might be a race issue when multi runqemu processess are
-            # running at the same time.
-            try:
-                os.mkdir(lockdir)
-                os.chmod(lockdir, 0o777)
-            except FileExistsError:
-                pass
+        self.make_lock_dir(lockdir)
 
         cmd = (ip, 'link')
         logger.debug('Running %s...' % str(cmd))
         ip_link = subprocess.check_output(cmd).decode('utf-8')
         # Matches line like: 6: tap0: <foo>
-        possibles = re.findall('^[0-9]+: +(tap[0-9]+): <.*', ip_link, re.M)
+        oe_tap_name = 'tap'
+        if 'OE_TAP_NAME' in os.environ:
+            oe_tap_name = os.environ['OE_TAP_NAME']
+        tap_re = '^[0-9]+: +(' + oe_tap_name + '[0-9]+): <.*'
+        possibles = re.findall(tap_re, ip_link, re.M)
         tap = ""
         for p in possibles:
             lockfile = os.path.join(lockdir, p)
@@ -1188,7 +1188,7 @@ to your build configuration.
             gid = os.getgid()
             uid = os.getuid()
             logger.info("Setting up tap interface under sudo")
-            cmd = ('sudo', self.qemuifup, str(uid), str(gid), self.bindir_native)
+            cmd = ('sudo', self.qemuifup, str(gid))
             try:
                 tap = subprocess.check_output(cmd).decode('utf-8').strip()
             except subprocess.CalledProcessError as e:
@@ -1204,7 +1204,7 @@ to your build configuration.
             logger.error("Failed to setup tap device. Run runqemu-gen-tapdevs to manually create.")
             sys.exit(1)
         self.tap = tap
-        tapnum = int(tap[3:])
+        tapnum = int(tap[len(oe_tap_name):])
         gateway = tapnum * 2 + 1
         client = gateway + 1
         if self.fstype == 'nfs':
@@ -1385,8 +1385,18 @@ to your build configuration.
         render_hint = """If /dev/dri/renderD* is absent due to lack of suitable GPU, 'modprobe vgem' will create one suitable for mesa llvmpipe software renderer."""
         try:
             content = os.listdir("/dev/dri")
-            if len([i for i in content if i.startswith('render')]) == 0:
-                raise RunQemuError("No render nodes found in /dev/dri: %s. %s" %(content, render_hint))
+            nodes = [i for i in content if i.startswith('renderD')]
+            if len(nodes) == 0:
+                raise RunQemuError("No render nodes found in /dev/dri/: %s. %s" %(content, render_hint))
+            for n in nodes:
+                try:
+                    with open(os.path.join("/dev/dri", n), "w") as f:
+                        f.close()
+                        break
+                except IOError:
+                    pass
+            else:
+                raise RunQemuError("None of the render nodes in /dev/dri/ are accessible: %s; you may need to add yourself to 'render' group or otherwise ensure you have read-write permissions on one of them." %(nodes))
         except FileNotFoundError:
             raise RunQemuError("/dev/dri directory does not exist; no render nodes available on this machine. %s" %(render_hint))
 
@@ -1459,6 +1469,19 @@ to your build configuration.
             for entry in self.get('SERIAL_CONSOLES').split(' '):
                 self.kernel_cmdline_script += ' console=%s' %entry.split(';')[1]
 
+        # We always wants ttyS0 and ttyS1 in qemu machines (see SERIAL_CONSOLES).
+        # If no serial or serialtcp options were specified, only ttyS0 is created
+        # and sysvinit shows an error trying to enable ttyS1:
+        #     INIT: Id "S1" respawning too fast: disabled for 5 minutes
+        serial_num = len(re.findall("-serial", self.qemu_opt))
+
+        # Assume if the user passed serial options, they know what they want
+        # and pad to two devices
+        if serial_num == 1:
+            self.qemu_opt += " -serial null"
+        elif serial_num >= 2:
+            return
+
         if self.serialstdio == True or self.nographic == True:
             self.qemu_opt += " -serial mon:stdio"
         else:
@@ -1470,10 +1493,6 @@ to your build configuration.
 
                 self.qemu_opt += " %s" % self.get("QB_SERIAL_OPT")
 
-        # We always wants ttyS0 and ttyS1 in qemu machines (see SERIAL_CONSOLES).
-        # If no serial or serialtcp options were specified, only ttyS0 is created
-        # and sysvinit shows an error trying to enable ttyS1:
-        #     INIT: Id "S1" respawning too fast: disabled for 5 minutes
         serial_num = len(re.findall("-serial", self.qemu_opt))
         if serial_num < 2:
             self.qemu_opt += " -serial null"
@@ -1599,17 +1618,17 @@ to your build configuration.
             uptime_seconds = f.readline().split()[0]
         logger.info('Host uptime: %s\n' % uptime_seconds)
         if self.cleantap:
-            cmd = ('sudo', self.qemuifdown, self.tap, self.bindir_native)
+            cmd = ('sudo', self.qemuifdown, self.tap)
             logger.debug('Running %s' % str(cmd))
             subprocess.check_call(cmd)
         self.release_taplock()
-        self.release_portlock()
 
         if self.nfs_running:
             logger.info("Shutting down the userspace NFS server...")
             cmd = ("runqemu-export-rootfs", "stop", self.rootfs)
             logger.debug('Running %s' % str(cmd))
             subprocess.check_call(cmd)
+        self.release_portlock()
 
         if self.saved_stty:
             subprocess.check_call(("stty", self.saved_stty))

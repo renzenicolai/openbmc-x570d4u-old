@@ -60,7 +60,6 @@ ALL_MULTILIB_PACKAGE_ARCHS = "${@all_multilib_tune_values(d, 'PACKAGE_ARCHS')}"
 # dwarfsrcfiles is used to determine the list of debug source files
 PACKAGE_DEPENDS += "rpm-native dwarfsrcfiles-native"
 
-
 # If your postinstall can execute at rootfs creation time rather than on
 # target but depends on a native/cross tool in order to execute, you need to
 # list that tool in PACKAGE_WRITE_DEPS. Target package dependencies belong
@@ -315,13 +314,21 @@ python package_get_auto_pr() {
 # Package functions suitable for inclusion in PACKAGEFUNCS
 #
 
-python package_convert_pr_autoinc() {
+python package_setup_pkgv() {
     pkgv = d.getVar("PKGV")
+    # Expand SRCPV into PKGV if not present
+    srcpv = bb.fetch.get_pkgv_string(d)
+    if srcpv and "+" in pkgv:
+        d.appendVar("PKGV", srcpv)
+        pkgv = d.getVar("PKGV")
 
     # Adjust pkgv as necessary...
     if 'AUTOINC' in pkgv:
         d.setVar("PKGV", pkgv.replace("AUTOINC", "${PRSERV_PV_AUTOINC}"))
+}
 
+
+python package_convert_pr_autoinc() {
     # Change PRSERV_PV_AUTOINC and EXTENDPRAUTO usage to special values
     d.setVar('PRSERV_PV_AUTOINC', '@PRSERV_PV_AUTOINC@')
     d.setVar('EXTENDPRAUTO', '@EXTENDPRAUTO@')
@@ -494,16 +501,15 @@ python do_package () {
         oe.qa.handle_error("var-undefined", msg, d)
         return
 
+    bb.build.exec_func("package_setup_pkgv", d)
     bb.build.exec_func("package_convert_pr_autoinc", d)
 
     # Check for conflict between renamed packages and existing ones
     # for each package in PACKAGES, check if it will be renamed to an existing one
     for p in packages:
-        localdata = bb.data.createCopy(d)
-        localdata.setVar('OVERRIDES', p)
-        rename = localdata.getVar('PKG')
-        if (rename != None) and rename in packages:
-            bb.fatal('package "%s" is renamed to "%s" using PKG:%s, but package name already exists'%(p,rename,p))
+        rename = d.getVar('PKG:%s' % p)
+        if rename and rename in packages:
+            bb.fatal('package "%s" is renamed to "%s" using PKG:%s, but package name already exists' % (p, rename, p))
 
     ###########################################################################
     # Optimisations
@@ -577,6 +583,7 @@ addtask do_package_setscene
 # Copy from PKGDESTWORK to tempdirectory as tempdirectory can be cleaned at both
 # do_package_setscene and do_packagedata_setscene leading to races
 python do_packagedata () {
+    bb.build.exec_func("package_setup_pkgv", d)
     bb.build.exec_func("package_get_auto_pr", d)
 
     src = d.expand("${PKGDESTWORK}")

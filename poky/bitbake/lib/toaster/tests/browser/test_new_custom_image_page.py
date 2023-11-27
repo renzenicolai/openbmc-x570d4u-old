@@ -6,6 +6,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0-only
 #
+from bldcontrol.models import BuildEnvironment
 
 from django.urls import reverse
 from tests.browser.selenium_helpers import SeleniumTestCase
@@ -18,6 +19,9 @@ class TestNewCustomImagePage(SeleniumTestCase):
     CUSTOM_IMAGE_NAME = 'roopa-doopa'
 
     def setUp(self):
+        BuildEnvironment.objects.get_or_create(
+            betype=BuildEnvironment.TYPE_LOCAL,
+        )
         release = Release.objects.create(
             name='baz',
             bitbake_version=BitbakeVersion.objects.create(name='v1')
@@ -44,8 +48,12 @@ class TestNewCustomImagePage(SeleniumTestCase):
         self.recipe = Recipe.objects.create(
             name='core-image-minimal',
             layer_version=layer_version,
+            file_path='/tmp/core-image-minimal.bb',
             is_image=True
         )
+        # create a tmp file for the recipe
+        with open(self.recipe.file_path, 'w') as f:
+            f.write('foo')
 
         # another project with a custom image already in it
         project2 = Project.objects.create(name='whoop', release=release)

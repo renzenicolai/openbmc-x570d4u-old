@@ -547,7 +547,10 @@ class GitApplyTree(PatchTree):
         reporoot = (runcmd("git rev-parse --show-toplevel".split(), self.dir) or '').strip()
         if not reporoot:
             raise Exception("Cannot get repository root for directory %s" % self.dir)
-        hooks_dir = os.path.join(reporoot, '.git', 'hooks')
+        gitdir = (runcmd("git rev-parse --absolute-git-dir".split(), self.dir) or '').strip()
+        if not gitdir:
+            raise Exception("Cannot get gitdir for directory %s" % self.dir)
+        hooks_dir = os.path.join(gitdir, 'hooks')
         hooks_dir_backup = hooks_dir + '.devtool-orig'
         if os.path.lexists(hooks_dir_backup):
             raise Exception("Git hooks backup directory already exists: %s" % hooks_dir_backup)
@@ -769,8 +772,9 @@ class NOOPResolver(Resolver):
             self.patchset.Push()
         except Exception:
             import sys
-            os.chdir(olddir)
             raise
+        finally:
+            os.chdir(olddir)
 
 # Patch resolver which relies on the user doing all the work involved in the
 # resolution, with the exception of refreshing the remote copy of the patch
@@ -830,9 +834,9 @@ class UserResolver(Resolver):
                             # User did not fix the problem.  Abort.
                             raise PatchError("Patch application failed, and user did not fix and refresh the patch.")
         except Exception:
-            os.chdir(olddir)
             raise
-        os.chdir(olddir)
+        finally:
+            os.chdir(olddir)
 
 
 def patch_path(url, fetch, workdir, expand=True):

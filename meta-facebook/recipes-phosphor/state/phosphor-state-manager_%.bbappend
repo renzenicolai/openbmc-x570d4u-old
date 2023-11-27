@@ -1,4 +1,4 @@
-FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}/${MACHINE}:"
 
 HOST_DEFAULT_TARGETS:append = " \
     obmc-host-shutdown@{}.target.wants/host-poweroff@{}.service \
@@ -16,6 +16,11 @@ CHASSIS_DEFAULT_TARGETS:append = " \
 CHASSIS_DEFAULT_TARGETS:remove = " \
     obmc-chassis-poweroff@{}.target.requires/obmc-powered-off@{}.service \
 "
+
+CHASSIS_DEFAULT_TARGETS:remove:greatlakes = " \
+    obmc-chassis-poweroff@{}.target.requires/obmc-power-stop@{}.service \
+    obmc-chassis-poweron@{}.target.requires/obmc-power-start@{}.service \
+    "
 
 SRC_URI:append:greatlakes = " \
     file://chassis-poweroff@.service \
@@ -55,6 +60,6 @@ do_install:append:greatlakes() {
     install -m 0777 ${WORKDIR}/power-ctrl-init ${D}${libexecdir}/${PN}/
 }
 
-FILES:${PN} += " /lib/systemd/system/*.service"
+FILES:${PN} += " ${systemd_system_unitdir}/*.service"
 
 SYSTEMD_SERVICE:${PN}-bmc:append:greatlakes = "power-ctrl-init.service"

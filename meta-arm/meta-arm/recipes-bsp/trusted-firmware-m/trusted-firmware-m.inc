@@ -8,8 +8,6 @@ DESCRIPTION = "Trusted Firmware-M"
 HOMEPAGE = "https://git.trustedfirmware.org/trusted-firmware-m.git"
 PROVIDES = "virtual/trusted-firmware-m"
 
-SRC_URI += "file://rwx.patch"
-
 UPSTREAM_CHECK_GITTAGREGEX = "^TF-Mv(?P<pver>\d+(\.\d+)+)$"
 
 # Note to future readers of this recipe: until the CMakeLists don't abuse
@@ -24,10 +22,13 @@ INHIBIT_DEFAULT_DEPS = "1"
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 
+# At present, TF-M needs GCC >10 but <11.3 so use 11.2:
+# https://git.trustedfirmware.org/TF-M/trusted-firmware-m.git/tree/docs/getting_started/tfm_getting_started.rst?h=TF-Mv1.8.0#n214
+#
 # See tools/requirements.txt for Python dependencies
 DEPENDS += "cmake-native \
             ninja-native \
-            gcc-arm-none-eabi-native \
+            gcc-arm-none-eabi-11.2-native \
             python3-cbor2-native \
             python3-click-native \
             python3-cryptography-native \
@@ -79,6 +80,9 @@ export CMAKE_BUILD_PARALLEL_LEVEL = "${@oe.utils.parallel_make(d, False)}"
 AS[unexport] = "1"
 CC[unexport] = "1"
 LD[unexport] = "1"
+
+# remove once arm-none-eabi-gcc updates to 13 or newer like poky
+DEBUG_PREFIX_MAP:remove = "-fcanon-prefix-map"
 
 # python3-cryptography needs the legacy provider, so set OPENSSL_MODULES to the
 # right path until this is relocated automatically.

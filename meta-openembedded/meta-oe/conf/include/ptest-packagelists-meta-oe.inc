@@ -20,15 +20,15 @@ PTESTS_FAST_META_OE = "\
     libee \
     libio-pty-perl \
     libmanette \
+    librelp \
     libssh \
     libtinyxml2 \
     libxml++-5.0 \
-    libxmlb \
     libyang \
     lmdb \
-    mcelog \
     minicoredumper \
     neon \
+    nlohmann-json \
     nodejs \
     onig \
     poco \
@@ -37,7 +37,11 @@ PTESTS_FAST_META_OE = "\
     uthash \
     xmlsec1 \
     zeromq \
+    cjson \
 "
+PTESTS_FAST_META_OE:append:x86 = " mcelog"
+PTESTS_FAST_META_OE:append:x86-64 = " mcelog"
+
 PTESTS_FAST_META_OE:remove:libc-musl = "minicoredumper"
 PTESTS_FAST_META_OE:remove:riscv64 = "nodejs"
 PTESTS_FAST_META_OE:remove:riscv32 = "nodejs"
@@ -46,11 +50,15 @@ PTESTS_SLOW_META_OE = "\
     fftw \
     libusb-compat \
     rsyslog \
+    mariadb \
+    re2 \
 "
+PTESTS_SLOW_META_OE:append:x86 = " kernel-selftest"
+PTESTS_SLOW_META_OE:append:x86-64 = " kernel-selftest"
+PTESTS_SLOW_META_OE:remove:libc-musl = "kernel-selftest"
 
 PTESTS_PROBLEMS_META_OE ="\
     jemalloc \
-    kernel-selftest \
     keyutils \
     libdbi-perl \
     libgpiod \

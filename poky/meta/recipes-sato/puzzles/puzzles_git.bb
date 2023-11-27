@@ -10,9 +10,9 @@ REQUIRED_DISTRO_FEATURES = "x11"
 SRC_URI = "git://git.tartarus.org/simon/puzzles.git;branch=main;protocol=https"
 
 UPSTREAM_CHECK_COMMITS = "1"
-SRCREV = "5a491c5ad333ef34c1e7713f920f51cbb205af60"
+SRCREV = "96d65e852cea8a95001fa70e3ec2996d4ea5e2b4"
 PE = "2"
-PV = "0.0+git${SRCPV}"
+PV = "0.0+git"
 
 S = "${WORKDIR}/git"
 
