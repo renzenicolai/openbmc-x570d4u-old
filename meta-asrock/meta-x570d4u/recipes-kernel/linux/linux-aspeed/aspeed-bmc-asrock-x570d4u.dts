@@ -2,57 +2,68 @@
 /dts-v1/;
 #include "aspeed-g5.dtsi"
 #include <dt-bindings/gpio/aspeed-gpio.h>
+#include <dt-bindings/leds/common.h>
 
 / {
 	model = "Asrock Rack X570D4U BMC";
-	compatible = "asrock,x570d4u-bmc";
+	compatible = "asrock,x570d4u-bmc", "aspeed,ast2500";
+
+	aliases {
+		i2c40 = &i2c4mux0ch0;
+		i2c41 = &i2c4mux0ch1;
+		i2c42 = &i2c4mux0ch2;
+		i2c43 = &i2c4mux0ch3;
+	};
 
 	chosen {
-			stdout-path = &uart5;
-			bootargs = "console=ttyS4,115200 earlycon";
+		stdout-path = &uart5;
 	};
 
 	memory@80000000 {
-			reg = <0x80000000 0x20000000>;
+		reg = <0x80000000 0x20000000>;
 	};
 
 	reserved-memory {
-			#address-cells = <1>;
-			#size-cells = <1>;
-			ranges;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
 
-			pci_memory: region@9A000000 {
-				no-map;
-				reg = <0x9A000000 0x00010000>; /* 64K */
-			};
+		pci_memory: region@9a000000 {
+			no-map;
+			reg = <0x9a000000 0x00010000>; /* 64K */
+		};
 
-			video_engine_memory: jpegbuffer {
-				size = <0x02800000>;	/* 40M */
-				alignment = <0x01000000>;
-				compatible = "shared-dma-pool";
-				reusable;
-			};
+		video_engine_memory: jpegbuffer {
+			size = <0x02800000>;	/* 40M */
+			alignment = <0x01000000>;
+			compatible = "shared-dma-pool";
+			reusable;
+		};
 
-			gfx_memory: framebuffer {
-				size = <0x01000000>;
-				alignment = <0x01000000>;
-				compatible = "shared-dma-pool";
-				reusable;
-			};
+		gfx_memory: framebuffer {
+			size = <0x01000000>;
+			alignment = <0x01000000>;
+			compatible = "shared-dma-pool";
+			reusable;
+		};
 	};
 
 	leds {
 		compatible = "gpio-leds";
 
-		heartbeat {
+		led-0 {
 			/* led-heartbeat-n */
 			gpios = <&gpio ASPEED_GPIO(H, 6) GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_HEARTBEAT;
 			linux,default-trigger = "timer";
 		};
 
-		system-fault {
+		led-1 {
 			/* led-fault-n */
 			gpios = <&gpio ASPEED_GPIO(Z, 2) GPIO_ACTIVE_LOW>;
+			color = <LED_COLOR_ID_AMBER>;
+			function = LED_FUNCTION_FAULT;
 			panic-indicator;
 		};
 	};
@@ -126,24 +137,15 @@
 	/*AB4-AC7*/     "",                                       "",                      "",                      "",
 	/*AC0-AC3*/     "",                                       "",                      "",                      "",
 	/*AC4-AC7*/     "",                                       "",                      "",                      "";
-
-
-	/* Assert output-bmc-ready to allow the BIOS to continue booting */
-	bmc-ready {
-		gpio-hog;
-		/* output-bmc-ready */
-		gpios = <ASPEED_GPIO(J, 0) GPIO_ACTIVE_LOW>;
-		output-high;
-	};
 };
 
 &fmc {
 	status = "okay";
 	flash@0 {
-			status = "okay";
-			label = "bmc";
-			m25p,fast-read;
-			spi-max-frequency = <10000000>;
+		status = "okay";
+		label = "bmc";
+		m25p,fast-read;
+		spi-max-frequency = <10000000>;
 #include "openbmc-flash-layout-64.dtsi"
 	};
 };
@@ -160,6 +162,9 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_rgmii1_default &pinctrl_mdio1_default>;
+
+	nvmem-cells = <&eth0_macaddress>;
+	nvmem-cell-names = "mac-address";
 };
 
 &mac1 {
@@ -167,9 +172,13 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_rmii2_default &pinctrl_mdio2_default>;
 	use-ncsi;
+
+	nvmem-cells = <&eth1_macaddress>;
+	nvmem-cell-names = "mac-address";
 };
 
 &i2c0 {
+	/* SMBus on auxiliary panel header (AUX_PANEL1) */
 	status = "okay";
 };
 
@@ -183,6 +192,7 @@
 };
 
 &i2c2 {
+	/* PSU SMBus (PSU_SMB1) */
 	status = "okay";
 };
 
@@ -193,36 +203,35 @@
 &i2c4 {
 	status = "okay";
 
-	i2c-switch@70 {
+	i2c-mux@70 {
 		compatible = "nxp,pca9545";
+		reg = <0x70>;
 		#address-cells = <1>;
 		#size-cells = <0>;
-		reg = <0x70>;
 
-		interrupt-parent = <&i2c_ic>;
-		interrupts = <4>;
-		interrupt-controller;
-		#interrupt-cells = <2>;
-
-		i2c@0 {
+		i2c4mux0ch0: i2c@0 {
+			/* SMBus on PCI express 16x slot */
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <0>;
 		};
 
-		i2c@1 {
+		i2c4mux0ch1: i2c@1 {
+			/* SMBus on PCI express 8x slot */
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <1>;
 		};
 
-		i2c@2 {
+		i2c4mux0ch2: i2c@2 {
+			/* Unknown */
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
 		};
 
-		i2c@3 {
+		i2c4mux0ch3: i2c@3 {
+			/* SMBus on PCI express 1x slot */
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <3>;
@@ -235,12 +244,23 @@
 };
 
 &i2c7 {
+	/* FRU and SPD EEPROM SMBus */
 	status = "okay";
 
 	eeprom@57 {
 		compatible = "st,24c128", "atmel,24c128";
 		reg = <0x57>;
 		pagesize = <16>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		eth0_macaddress: macaddress@3f80 {
+			reg = <0x3f80 6>;
+		};
+
+		eth1_macaddress: macaddress@3f88 {
+			reg = <0x3f88 6>;
+		};
 	};
 };
 
@@ -259,6 +279,7 @@
 &ehci1 {
 	status = "okay";
 };
+
 &uhci {
 	status = "okay";
 };
@@ -296,29 +317,41 @@
 				&pinctrl_pwm3_default
 				&pinctrl_pwm4_default
 				&pinctrl_pwm5_default>;
+
 	fan@0 {
+		/* FAN1 (4-pin) */
 		reg = <0x00>;
-		aspeed,fan-tach-ch = /bits/ 8 <0x00 0x01>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x00>;
 	};
+
 	fan@1 {
+		/* FAN2 (4-pin) */
 		reg = <0x01>;
-		aspeed,fan-tach-ch = /bits/ 8 <0x02 0x03>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x01>;
 	};
+
 	fan@2 {
+		/* FAN3 (4-pin) */
 		reg = <0x02>;
-		aspeed,fan-tach-ch = /bits/ 8 <0x04 0x05>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x02>;
 	};
+
 	fan@3 {
+		/* FAN4 (6-pin) */
 		reg = <0x03>;
-		aspeed,fan-tach-ch = /bits/ 8 <0x06 0x07>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x04 0x0b>;
 	};
+
 	fan@4 {
+		/* FAN6 (6-pin) */
 		reg = <0x04>;
-		aspeed,fan-tach-ch = /bits/ 8 <0x08 0x09>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x06 0x0d>;
 	};
+
 	fan@5 {
+		/* FAN5 (6-pin) */
 		reg = <0x05>;
-		aspeed,fan-tach-ch = /bits/ 8 <0x0a 0x0b>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x05 0x0c>;
 	};
 };
 
